@@ -1,8 +1,11 @@
+import json
 import math
 import operator
+from operator import getitem
 
 import numpy as np
 import pandas as pd
+import progressbar
 
 
 def prepare_matrix(filename):
@@ -35,10 +38,10 @@ def matrix_equal(df1, df2):
 
 def sum_squared_distance_matrix(df1, df2):
     adf1, adf2 = df1.align(df2, join="outer", axis=1)
-    full_sdf = (adf1 - adf2) ** 2
-    full_sdf = full_sdf.dropna(axis=1, how="all")
-    full_sdf_val = full_sdf.fillna(0).values.sum()
-    return full_sdf_val
+    full_ssd = (adf1 - adf2) ** 2
+    full_ssd = full_ssd.dropna(axis=1, how="all")
+    full_ssd_val = full_ssd.fillna(0).values.sum()
+    return full_ssd_val
 
 
 def compare_matrix_windowed(df1, df2, pep_window):
@@ -69,18 +72,60 @@ def compare_matrix_windowed(df1, df2, pep_window):
     return sdfs_sorted
 
 
-def compare_files(file1, file2, pep_window):
-    df1 = prepare_matrix(file1)
+def compare_two_files(base_file, second_file, pep_window):
+    df1 = prepare_matrix(base_file)
     df1_sd = sd_matrix(df1)
     df1_weigthed = weight_matrix(df1)
 
-    df2 = prepare_matrix(file2)
+    df2 = prepare_matrix(second_file)
     df2_sd = sd_matrix(df2)
     df2_weigthed = weight_matrix(df2)
 
-    sdf = sum_squared_distance_matrix(df1_weigthed, df2_weigthed)
+    ssd = sum_squared_distance_matrix(df1_weigthed, df2_weigthed)
     equality = matrix_equal(df1_weigthed, df2_weigthed)
     sdfs = compare_matrix_windowed(df1_weigthed, df2_weigthed, pep_window)
 
-    return equality, df1_sd, df2_sd, sdf, sdfs
+    return equality, df1_sd, df2_sd, ssd, sdfs
 
+
+def compare_combined_file(base_file, combined_file, pep_window):
+
+    with open(combined_file) as json_file:
+        data = json.load(json_file)
+        bar = progressbar.ProgressBar(
+            maxval=len(data),
+            widgets=[progressbar.Bar("=", "[", "]"), " ", progressbar.Percentage()],
+        )
+
+        results = []
+        bar.start()
+        i = 0
+
+        for pssm in data:
+            res = {}
+            try:
+                json_pssm = json.dumps(data[pssm]["pssm"])
+                equality, _, _, ssd, sdfs = compare_two_files(
+                    base_file, json_pssm, pep_window
+                )
+                res["equality"] = equality
+                res["base"] = base_file
+                res["second"] = data[pssm]["motif"]
+                res["ssd"] = ssd
+                res["sdf"] = sdfs[0]
+                results.append(res)
+
+            except TypeError as ex:
+                print("error: {} on pssm: {}".format(ex, pssm))
+
+            except IndexError as ex:
+                print("error: {} on pssm: {}, res: {} ".format(ex, pssm, res))
+
+            i += 1
+            bar.update(i)
+
+        bar.finish()
+
+        results.sort(key=lambda x: x["sdf"][1])
+        
+        return results
