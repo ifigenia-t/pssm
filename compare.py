@@ -35,7 +35,6 @@ if args.second_file:
     print("Dataframes equal: {} ".format(equality))
     print("Sum of square distance: {}".format(ssd))
     for k, v in sdfs:
-        #  if v <= 400:
         print("{} ===> {}".format(k, v))
 
 
@@ -48,7 +47,7 @@ if args.combined_file:
     res_by_ssd = results[0]
 
     print(
-        "---> Base: {} Second: {} SSD: {} SDF: {}".format(
+        "---> Window Calculations = Base: {} Second: {} SSD: {} SDF: {}".format(
             res_by_sdf["base"],
             res_by_sdf["second"],
             res_by_sdf["ssd"],
@@ -56,7 +55,7 @@ if args.combined_file:
         )
     )
     print(
-        "---> Base: {} Second: {} SSD: {} SDF: {}".format(
+        "---> Whole Matrix Comparisons = Base: {} Second: {} SSD: {} SDF: {}".format(
             res_by_ssd["base"],
             res_by_ssd["second"],
             res_by_ssd["ssd"],

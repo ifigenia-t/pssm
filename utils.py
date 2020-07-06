@@ -9,6 +9,9 @@ import progressbar
 
 
 def prepare_matrix(filename):
+    '''
+    Opens a json file and converts it to a dataframe of the correct format
+    '''
     df = pd.read_json(filename)
     df = df.dropna(axis=1, how="all")
     df_proc = df.T
@@ -18,6 +21,10 @@ def prepare_matrix(filename):
 
 
 def sd_matrix(df):
+    '''
+    Calculates the Standard Deviation of each column and returns a dictionary 
+    containing the positions with the most significant SD
+    '''
     df_std = df.std(axis=0, skipna=True)
     df_std = df_std[df_std > df_std.mean()]
     df_index = [ind for ind in df_std.index]
@@ -25,6 +32,9 @@ def sd_matrix(df):
 
 
 def weight_matrix(df):
+    '''
+    Calculates the gini column weights and creates a new weighted PSSM
+    '''
     mad = abs(np.subtract.outer(df, df)).mean()
     rmad = mad / df.mean()
     g1 = 0.5 * rmad
@@ -33,10 +43,16 @@ def weight_matrix(df):
 
 
 def matrix_equal(df1, df2):
+    '''
+    Returns a boolean whether two matrices are equal
+    '''
     return df2.equals(df1)
 
 
 def sum_squared_distance_matrix(df1, df2):
+    '''
+    Calculates the squared distances of two matrices and returns the sum value
+    '''
     adf1, adf2 = df1.align(df2, join="outer", axis=1)
     full_ssd = (adf1 - adf2) ** 2
     full_ssd = full_ssd.dropna(axis=1, how="all")
@@ -45,6 +61,10 @@ def sum_squared_distance_matrix(df1, df2):
 
 
 def compare_matrix_windowed(df1, df2, pep_window):
+    '''
+    Compares two matrices using a window of comparison and returns a dictionary
+    containing the positions of each matrix and the SSD
+    '''
     sdfs = {}
 
     it_window_a = len(df1.columns) - pep_window
@@ -73,6 +93,9 @@ def compare_matrix_windowed(df1, df2, pep_window):
 
 
 def compare_two_files(base_file, second_file, pep_window):
+    '''
+    Calculate all the comparisons for two PSSMs
+    '''
     df1 = prepare_matrix(base_file)
     df1_sd = sd_matrix(df1)
     df1_weigthed = weight_matrix(df1)
@@ -89,6 +112,10 @@ def compare_two_files(base_file, second_file, pep_window):
 
 
 def compare_combined_file(base_file, combined_file, pep_window):
+    '''
+    Calculate all the comparisons for a PSSM and a .json file cointaing multiple
+    PSSMs
+    '''
 
     with open(combined_file) as json_file:
         data = json.load(json_file)
