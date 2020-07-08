@@ -20,6 +20,19 @@ def prepare_matrix(filename):
     return df_proc
 
 
+def normalise_matrix(df):
+    '''
+    Performs normalisation calculations on each column of the matrix and returns
+    the normalised matrix
+    Pandas automatically applies colomn-wise functions.
+    '''
+    normalized_df = (df-df.min())
+    normalized_df = (normalized_df/normalized_df.sum())
+    normalized_df = normalized_df.round(decimals=2)
+    return normalized_df
+    
+
+
 def sd_matrix(df):
     '''
     Calculates the Standard Deviation of each column and returns a dictionary 
@@ -97,12 +110,14 @@ def compare_two_files(base_file, second_file, pep_window):
     Calculate all the comparisons for two PSSMs
     '''
     df1 = prepare_matrix(base_file)
+    df1_norm = normalise_matrix(df1)
     df1_sd = sd_matrix(df1)
-    df1_weigthed = weight_matrix(df1)
+    df1_weigthed = weight_matrix(df1_norm)
 
     df2 = prepare_matrix(second_file)
     df2_sd = sd_matrix(df2)
-    df2_weigthed = weight_matrix(df2)
+    df2_norm = normalise_matrix(df2)
+    df2_weigthed = weight_matrix(df2_norm)
 
     ssd = sum_squared_distance_matrix(df1_weigthed, df2_weigthed)
     equality = matrix_equal(df1_weigthed, df2_weigthed)
