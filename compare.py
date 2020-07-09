@@ -1,6 +1,6 @@
 import argparse
 
-from utils import compare_combined_file, compare_two_files
+from utils import compare_combined_file, compare_two_files, print_df_ranges
 
 pep_window = 4
 
@@ -24,8 +24,8 @@ if (not args.second_file) and (not args.combined_file):
 base_file = args.base_file
 
 if args.second_file:
-    second_file = args.second_files
-    equality, f1_sd, f2_sd, ssd, sdfs = compare_two_files(
+    second_file = args.second_file
+    equality, f1_sd, f2_sd, ssd, sdfs, df1, df2 = compare_two_files(
         base_file, second_file, pep_window
     )
     print("Positions with significant SD for file: {} are: {}".format(base_file, f1_sd))
@@ -34,9 +34,12 @@ if args.second_file:
     )
     print("Dataframes equal: {} ".format(equality))
     print("Sum of square distance: {}".format(ssd))
-    for k, v in sdfs:
-        print("{} ===> {}".format(k, v))
-
+    res_by_sdf = sdfs[0]
+    regions = res_by_sdf[0]
+    region_a, region_b = regions.split(" - ")
+    print("{} ===> {}".format(res_by_sdf[0], res_by_sdf[1]))
+    print_df_ranges(df1, region_a)
+    print_df_ranges(df2, region_b)
 
 if args.combined_file:
     combined_file = args.combined_file
@@ -45,6 +48,8 @@ if args.combined_file:
     res_by_sdf = results[0]
     results.sort(key=lambda x: x["ssd"])
     res_by_ssd = results[0]
+    regions = res_by_sdf["sdf"][0]
+    region_a, region_b = regions.split(" - ")
 
     print(
         "---> Window Calculations = Base: {} Second: {} SSD: {} SDF: {}".format(
@@ -62,3 +67,6 @@ if args.combined_file:
             res_by_ssd["sdf"],
         )
     )
+    print_df_ranges(res_by_sdf["df1"], region_a)
+    print_df_ranges(res_by_sdf["df2"], region_b)
+

@@ -61,6 +61,7 @@ def weight_matrix(df):
     return df_weighted
 
 
+
 def matrix_equal(df1, df2):
     '''
     Returns a boolean whether two matrices are equal
@@ -99,7 +100,7 @@ def compare_matrix_windowed(df1, df2, pep_window):
 
             a.columns = [ind for ind in range(0, len(a.columns))]
             b.columns = [ind for ind in range(0, len(b.columns))]
-
+            
             sdf = (a - b) ** 2
 
             sdfs["{}:{} - {}:{}".format(i, i + pep_window, j, j + pep_window)] = (
@@ -129,7 +130,7 @@ def compare_two_files(base_file, second_file, pep_window):
     equality = matrix_equal(df1_weigthed, df2_weigthed)
     sdfs = compare_matrix_windowed(df1_weigthed, df2_weigthed, pep_window)
 
-    return equality, df1_sd, df2_sd, ssd, sdfs
+    return equality, df1_sd, df2_sd, ssd, sdfs, df1_weigthed, df2_weigthed
 
 
 def compare_combined_file(base_file, combined_file, pep_window):
@@ -153,7 +154,7 @@ def compare_combined_file(base_file, combined_file, pep_window):
             res = {}
             try:
                 json_pssm = json.dumps(data[pssm]["pssm"])
-                equality, _, _, ssd, sdfs = compare_two_files(
+                equality, _, _, ssd, sdfs, df1, df2 = compare_two_files(
                     base_file, json_pssm, pep_window
                 )
                 res["equality"] = equality
@@ -161,6 +162,8 @@ def compare_combined_file(base_file, combined_file, pep_window):
                 res["second"] = data[pssm]["motif"]
                 res["ssd"] = ssd
                 res["sdf"] = sdfs[0]
+                res["df1"] = df1
+                res["df2"] = df2
                 results.append(res)
 
             except TypeError as ex:
@@ -177,3 +180,8 @@ def compare_combined_file(base_file, combined_file, pep_window):
         results.sort(key=lambda x: x["sdf"][1])
         
         return results
+
+
+def print_df_ranges(df,region):
+    a,b = region.split(":")
+    print(df.loc[:,a:b])
