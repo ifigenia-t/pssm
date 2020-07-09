@@ -48,10 +48,16 @@ def weight_matrix(df):
     '''
     Calculates the gini column weights and creates a new weighted PSSM
     '''
-    mad = abs(np.subtract.outer(df, df)).mean()
-    rmad = mad / df.mean()
-    g1 = 0.5 * rmad
-    df_weighted = df * g1
+    d = {}
+    for col in df.columns:
+        col_list = df[col].to_numpy()
+        mad = np.abs(np.subtract.outer(col_list, col_list)).mean()
+        rmad = mad / col_list.mean()
+        g1 = 0.5 * rmad
+        d[col] = g1
+
+    df_weighted = df * d
+    df_weighted = df_weighted.round(decimals=2)
     return df_weighted
 
 
