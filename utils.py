@@ -10,9 +10,9 @@ import progressbar
 
 
 def prepare_matrix(filename):
-    '''
+    """
     Opens a json file and converts it to a dataframe of the correct format
-    '''
+    """
     df = pd.read_json(filename)
     df = df.dropna(axis=1, how="all")
     df_proc = df.T
@@ -22,33 +22,29 @@ def prepare_matrix(filename):
 
 
 def normalise_matrix(df):
-    '''
+    """
     Performs normalisation calculations on each column of the matrix and returns
     the normalised matrix
     Pandas automatically applies colomn-wise functions.
-    '''
-    normalized_df = (df-df.min())
-    normalized_df = (normalized_df/normalized_df.sum())
+    """
+    normalized_df = df - df.min()
+    normalized_df = normalized_df / normalized_df.sum()
     normalized_df = normalized_df.round(decimals=2)
     return normalized_df
-    
 
 
 def sd_matrix(df):
-    '''
+    """
     Calculates the Standard Deviation of each column and returns a dictionary 
     containing the positions with the most significant SD
-    '''
+    """
     df_std = df.std(axis=0, skipna=True)
     df_std = df_std[df_std > df_std.mean()]
     df_index = [ind for ind in df_std.index]
     return df_index
 
 
-def weight_matrix(df):
-    '''
-    Calculates the gini column weights and creates a new weighted PSSM
-    '''
+def gini_weight(df):
     d = {}
     for col in df.columns:
         col_list = df[col].to_numpy()
@@ -57,66 +53,76 @@ def weight_matrix(df):
         g1 = 0.5 * rmad
         d[col] = g1
 
-    df_weighted = df * d
+    return d
+
+
+def weight_matrix(df):
+    """
+    Calculates the gini column weights and creates a new weighted PSSM
+    """
+    df_weighted = df * gini_weight(df)
     df_weighted = df_weighted.round(decimals=2)
     return df_weighted
 
 
-
 def matrix_equal(df1, df2):
-    '''
+    """
     Returns a boolean whether two matrices are equal
-    '''
+    """
     return df2.equals(df1)
 
 
 def sum_squared_distance_matrix(df1, df2):
-    '''
+    """
     Calculates the squared distances of two matrices and returns the sum value
-    '''
+    """
     adf1, adf2 = df1.align(df2, join="outer", axis=1)
     full_ssd = (adf1 - adf2) ** 2
     full_ssd = full_ssd.dropna(axis=1, how="all")
     full_ssd_val = full_ssd.fillna(0).values.sum()
     return full_ssd_val
 
-def euclidian_distance(df1,df2):
-    '''
+
+def euclidian_distance(df1, df2):
+    """
     Calculates the euclidian distance of the two matrices. Sort will be ascending.
-    '''
-    ed_df = (df1-df2)**2
+    """
+    ed_df = (df1 - df2) ** 2
     ed_df = ed_df.dropna(axis=1, how="all")
     full_eu = math.sqrt(ed_df.fillna(0).values.sum())
     return full_eu
 
-def Kullback_Leibler_distance(df1,df2):
-    '''
+
+def Kullback_Leibler_distance(df1, df2):
+    """
     Calculates the Kullback-Leibler distance of the two matrices. 
     As defined in Aerts et al. (2003). Also called Mutual Information.
     Sort will be ascending.
-    '''
-    kld_df = (df1 * math.log(sum(df1/df2)))
+    """
+    kld_df = df1 * math.log(sum(df1 / df2))
     kld_df = kld_df.dropna(axis=1, how="all")
     full_kld = sum(kld_df)
     return full_kld
 
-def correlation_coefficient(df1,df2):
-    '''
+
+def correlation_coefficient(df1, df2):
+    """
     Calculates and return the correlation coefficient of two matrices.
     Sort will be decreasing.
-    '''
+    """
     mean1 = sum(df1.mean())
     mean2 = sum(df2.mean())
-    summerA = (df1-mean1) * (df2 -mean2)
+    summerA = (df1 - mean1) * (df2 - mean2)
     summerB = (df1 - mean1) ** 2
     summerC = (df2 - mean2) ** 2
-    return sum(summerA)/math.sqrt((sum(summerB)*sum(summerC)))
+    return sum(summerA) / math.sqrt((sum(summerB) * sum(summerC)))
+
 
 def compare_matrix_windowed(df1, df2, pep_window):
-    '''
+    """
     Compares two matrices using a window of comparison and returns a dictionary
     containing the positions of each matrix and the SSD
-    '''
+    """
     sdfs = {}
 
     it_window_a = len(df1.columns) - pep_window
@@ -132,8 +138,21 @@ def compare_matrix_windowed(df1, df2, pep_window):
 
             a.columns = [ind for ind in range(0, len(a.columns))]
             b.columns = [ind for ind in range(0, len(b.columns))]
-            
-            sdf = (a - b) ** 2
+
+            weight_a = 0
+            weight_b = 0
+
+            dfa_gini = gini_weight(a)
+            dfb_gini = gini_weight(b)
+
+            for k, v in dfa_gini.items():
+                weight_a += 1 - v
+
+            for k, v in dfb_gini.items():
+                weight_b += 1 - v
+
+            # sdf = (a - b) ** 2
+            sdf = ((a - b) **2) * weight_a * weight_b
 
             sdfs["{}:{} - {}:{}".format(i, i + pep_window, j, j + pep_window)] = (
                 sdf.fillna(0).values.sum().round(decimals=3)
@@ -145,9 +164,9 @@ def compare_matrix_windowed(df1, df2, pep_window):
 
 
 def compare_two_files(base_file, second_file, pep_window):
-    '''
+    """
     Calculate all the comparisons for two PSSMs
-    '''
+    """
     df1 = prepare_matrix(base_file)
     df1_norm = normalise_matrix(df1)
     df1_sd = sd_matrix(df1)
@@ -158,18 +177,18 @@ def compare_two_files(base_file, second_file, pep_window):
     df2_norm = normalise_matrix(df2)
     df2_weigthed = weight_matrix(df2_norm)
 
-    ssd = sum_squared_distance_matrix(df1_weigthed, df2_weigthed)
-    equality = matrix_equal(df1_weigthed, df2_weigthed)
-    sdfs = compare_matrix_windowed(df1_weigthed, df2_weigthed, pep_window)
+    ssd = sum_squared_distance_matrix(df1_norm, df2_norm)
+    equality = matrix_equal(df1_norm, df2_norm)
+    sdfs = compare_matrix_windowed(df1_norm, df2_norm, pep_window)
 
     return equality, df1_sd, df2_sd, ssd, sdfs, df1_weigthed, df2_weigthed
 
 
 def compare_combined_file(base_file, combined_file, pep_window):
-    '''
+    """
     Calculate all the comparisons for a PSSM and a .json file cointaing multiple
     PSSMs
-    '''
+    """
 
     with open(combined_file) as json_file:
         data = json.load(json_file)
@@ -210,10 +229,10 @@ def compare_combined_file(base_file, combined_file, pep_window):
         bar.finish()
 
         results.sort(key=lambda x: x["sdf"][1])
-        
+
         return results
 
 
-def print_df_ranges(df,region):
-    a,b = region.split(":")
-    print(df.loc[:,a:b])
+def print_df_ranges(df, region):
+    a, b = region.split(":")
+    print(df.loc[:, int(a):int(b)])
