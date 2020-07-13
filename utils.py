@@ -5,6 +5,7 @@ from operator import getitem
 
 import numpy as np
 import pandas as pd
+import math
 import progressbar
 
 
@@ -79,6 +80,37 @@ def sum_squared_distance_matrix(df1, df2):
     full_ssd_val = full_ssd.fillna(0).values.sum()
     return full_ssd_val
 
+def euclidian_distance(df1,df2):
+    '''
+    Calculates the euclidian distance of the two matrices. Sort will be ascending.
+    '''
+    ed_df = (df1-df2)**2
+    ed_df = ed_df.dropna(axis=1, how="all")
+    full_eu = math.sqrt(ed_df.fillna(0).values.sum())
+    return full_eu
+
+def Kullback_Leibler_distance(df1,df2):
+    '''
+    Calculates the Kullback-Leibler distance of the two matrices. 
+    As defined in Aerts et al. (2003). Also called Mutual Information.
+    Sort will be ascending.
+    '''
+    kld_df = (df1 * math.log(sum(df1/df2)))
+    kld_df = kld_df.dropna(axis=1, how="all")
+    full_kld = sum(kld_df)
+    return full_kld
+
+def correlation_coefficient(df1,df2):
+    '''
+    Calculates and return the correlation coefficient of two matrices.
+    Sort will be decreasing.
+    '''
+    mean1 = sum(df1.mean())
+    mean2 = sum(df2.mean())
+    summerA = (df1-mean1) * (df2 -mean2)
+    summerB = (df1 - mean1) ** 2
+    summerC = (df2 - mean2) ** 2
+    return sum(summerA)/math.sqrt((sum(summerB)*sum(summerC)))
 
 def compare_matrix_windowed(df1, df2, pep_window):
     '''
