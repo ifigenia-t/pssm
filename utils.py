@@ -52,8 +52,8 @@ def gini_weight(df):
         rmad = mad / col_list.mean()
         g1 = 0.5 * rmad
         d[col] = g1
-
-    return d
+        d_df = pd.DataFrame.from_dict(d, orient="index")
+    return d_df
 
 
 def weight_matrix(df):
@@ -130,32 +130,36 @@ def compare_matrix_windowed(df1, df2, pep_window):
 
     for i in range(0, it_window_a):
         for j in range(0, it_window_b):
-
             # print("===> i: {}:{} j: {}:{}".format(i, i + pep_window, j, j + pep_window))
-
             a = df1.loc[:, i : i + pep_window]
             b = df2.loc[:, j : j + pep_window]
 
             a.columns = [ind for ind in range(0, len(a.columns))]
             b.columns = [ind for ind in range(0, len(b.columns))]
 
-            weight_a = 0
-            weight_b = 0
+            a_gini = gini_weight(a).apply(lambda x: 1 - x)
+            a_gini_df = a_gini.T
+            b_gini = gini_weight(b).apply(lambda x: 1 - x)
+            b_gini_df = b_gini.T
 
-            dfa_gini = gini_weight(a)
-            dfb_gini = gini_weight(b)
+            a_gini_df = pd.DataFrame(np.repeat(a_gini_df.values, len(a.index), axis=0))
+            b_gini_df = pd.DataFrame(np.repeat(b_gini_df.values, len(b.index), axis=0))
 
-            for k, v in dfa_gini.items():
-                weight_a += 1 - v
+            a_all = a * a_gini_df.values
+            b_all = a * b_gini_df.values
+            # for k, v in a_gini.items():
+            #     weight_a += 1 - v
 
-            for k, v in dfb_gini.items():
-                weight_b += 1 - v
+            # for k, v in b_gini.items():
+            #     weight_b += 1 - v
 
-            # sdf = (a - b) ** 2
-            sdf = ((a - b) **2) * weight_a * weight_b
+            sdf = (a_all - b_all) ** 2
+            sdf = sdf[sdf < sdf.mean()].fillna(1)
+
+            # sdf = ((a - b) **2) * weight_a * weight_b
 
             sdfs["{}:{} - {}:{}".format(i, i + pep_window, j, j + pep_window)] = (
-                sdf.fillna(0).values.sum().round(decimals=3)
+                sdf.fillna(1).values.sum().round(decimals=3)
             )
 
         sdfs_sorted = sorted(sdfs.items(), key=operator.itemgetter(1))
@@ -181,7 +185,7 @@ def compare_two_files(base_file, second_file, pep_window):
     equality = matrix_equal(df1_norm, df2_norm)
     sdfs = compare_matrix_windowed(df1_norm, df2_norm, pep_window)
 
-    return equality, df1_sd, df2_sd, ssd, sdfs, df1_weigthed, df2_weigthed
+    return equality, df1_sd, df2_sd, ssd, sdfs, df1_norm, df2_norm
 
 
 def compare_combined_file(base_file, combined_file, pep_window):
@@ -235,4 +239,5 @@ def compare_combined_file(base_file, combined_file, pep_window):
 
 def print_df_ranges(df, region):
     a, b = region.split(":")
-    print(df.loc[:, int(a):int(b)])
+    print(df.loc[:, int(a) : int(b)])
+
