@@ -124,6 +124,7 @@ def compare_matrix_windowed(df1, df2, pep_window):
     containing the positions of each matrix and the SSD
     """
     sdfs = {}
+    ssd_sum_dic = {}
 
     it_window_a = len(df1.columns) - pep_window
     it_window_b = len(df2.columns) - pep_window
@@ -147,24 +148,43 @@ def compare_matrix_windowed(df1, df2, pep_window):
 
             a_all = a * a_gini_df.values
             b_all = a * b_gini_df.values
-            # for k, v in a_gini.items():
-            #     weight_a += 1 - v
 
-            # for k, v in b_gini.items():
-            #     weight_b += 1 - v
+            ssd = (a-b)**2
+            ssd_sum = ssd.sum()
+            ssd_sum = pd.DataFrame(ssd_sum)
+            ssd_sum = ssd_sum.T
+            ssd_sum = ssd_sum.rename(index={0: 'SSD'})
 
+            # 1st way
             sdf = (a_all - b_all) ** 2
             sdf = sdf[sdf < sdf.mean()].fillna(1)
 
-            # sdf = ((a - b) **2) * weight_a * weight_b
+            # Suggested way:
+            # SDF as sum(SSD * (1 - gini1) * (1 - gini2)) 
+            # and sum(SSD * (1 - gini1 * gini2))
+
+            # Suggested way 1:
+            # sdf = (ssd_sum * a_gini_df.values * b_gini_df.values)
+
+            # Suggested way 2:
+            # sdf = (ssd_sum * (1-(gini_weight(a).T * gini_weight(b).T)))
+            
+
 
             sdfs["{}:{} - {}:{}".format(i, i + pep_window, j, j + pep_window)] = (
                 sdf.fillna(1).values.sum().round(decimals=3)
             )
+            ssd_sum_dic["{}:{} - {}:{}".format(i, i + pep_window, j, j + pep_window)]=ssd_sum
 
         sdfs_sorted = sorted(sdfs.items(), key=operator.itemgetter(1))
 
-    return sdfs_sorted
+    sdf_0 = sdfs_sorted[0]
+    if sdf_0[0] in ssd_sum_dic:
+      ssd_print = ssd_sum_dic[sdf_0[0]]
+    #   print(ssd_print)
+
+    return sdfs_sorted, ssd_print
+    
 
 
 def compare_two_files(base_file, second_file, pep_window):
@@ -174,18 +194,18 @@ def compare_two_files(base_file, second_file, pep_window):
     df1 = prepare_matrix(base_file)
     df1_norm = normalise_matrix(df1)
     df1_sd = sd_matrix(df1)
-    df1_weigthed = weight_matrix(df1_norm)
+    # df1_weigthed = weight_matrix(df1_norm)
 
     df2 = prepare_matrix(second_file)
     df2_sd = sd_matrix(df2)
     df2_norm = normalise_matrix(df2)
-    df2_weigthed = weight_matrix(df2_norm)
+    # df2_weigthed = weight_matrix(df2_norm)
 
     ssd = sum_squared_distance_matrix(df1_norm, df2_norm)
     equality = matrix_equal(df1_norm, df2_norm)
-    sdfs = compare_matrix_windowed(df1_norm, df2_norm, pep_window)
+    sdfs, ssd_print = compare_matrix_windowed(df1_norm, df2_norm, pep_window)
 
-    return equality, df1_sd, df2_sd, ssd, sdfs, df1_norm, df2_norm
+    return equality, df1_sd, df2_sd, ssd, sdfs, df1_norm, df2_norm, ssd_print
 
 
 def compare_combined_file(base_file, combined_file, pep_window):
@@ -209,7 +229,7 @@ def compare_combined_file(base_file, combined_file, pep_window):
             res = {}
             try:
                 json_pssm = json.dumps(data[pssm]["pssm"])
-                equality, _, _, ssd, sdfs, df1, df2 = compare_two_files(
+                equality, _, _, ssd, sdfs, df1, df2, ssd_print = compare_two_files(
                     base_file, json_pssm, pep_window
                 )
                 res["equality"] = equality
@@ -219,6 +239,7 @@ def compare_combined_file(base_file, combined_file, pep_window):
                 res["sdf"] = sdfs[0]
                 res["df1"] = df1
                 res["df2"] = df2
+                res["ssd_print"] = ssd_print
                 results.append(res)
 
             except TypeError as ex:
@@ -237,7 +258,16 @@ def compare_combined_file(base_file, combined_file, pep_window):
         return results
 
 
-def print_df_ranges(df, region):
+def print_df_ranges(df, region, ssd_print):
     a, b = region.split(":")
-    print(df.loc[:, int(a) : int(b)])
+    gini = gini_weight(df)
+    gini = gini.T
+    new_df = df.append(gini)
+    new_df = new_df.rename(index={0: 'Gini'})
+    column_list = list(range(int(a),int(b)+1))
+    ssd_print.columns =  column_list
+    
+    new_df = new_df.append(ssd_print)
+    
+    print(new_df.loc[:, int(a) : int(b)])
 
