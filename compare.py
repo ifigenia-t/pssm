@@ -25,9 +25,18 @@ base_file = args.base_file
 
 if args.second_file:
     second_file = args.second_file
-    equality, f1_sd, f2_sd, ssd, sdfs, df1, df2, ssd_print = compare_two_files(
-        base_file, second_file, pep_window
-    )
+    (
+        equality,
+        f1_sd,
+        f2_sd,
+        ssd,
+        sdfs,
+        df1,
+        df2,
+        ssd_print,
+        pearsons,
+        spearmans
+    ) = compare_two_files(base_file, second_file, pep_window)
     print("Positions with significant SD for file: {} are: {}".format(base_file, f1_sd))
     print(
         "Positions with significant SD for file: {} are: {}".format(second_file, f2_sd)
@@ -38,8 +47,8 @@ if args.second_file:
     regions = res_by_sdf[0]
     region_a, region_b = regions.split(" - ")
     print("{} ===> {}".format(res_by_sdf[0], res_by_sdf[1]))
-    print_df_ranges(df1, region_a, ssd_print)
-    print_df_ranges(df2, region_b, ssd_print)
+    print_df_ranges(df1, region_a, ssd_print, pearsons, spearmans)
+    print_df_ranges(df2, region_b, ssd_print, pearsons, spearmans)
 
 if args.combined_file:
     combined_file = args.combined_file
@@ -67,6 +76,18 @@ if args.combined_file:
             res_by_ssd["sdf"],
         )
     )
-    print_df_ranges(res_by_sdf["df1"], region_a, res_by_ssd["ssd_print"])
-    print_df_ranges(res_by_sdf["df2"], region_b, res_by_ssd["ssd_print"])
+    print_df_ranges(
+        res_by_sdf["df1"],
+        region_a,
+        res_by_ssd["ssd_print"],
+        res_by_ssd["pearsons"],
+        res_by_ssd["spearmans"],
+    )
+    print_df_ranges(
+        res_by_sdf["df2"],
+        region_b,
+        res_by_ssd["ssd_print"],
+        res_by_ssd["pearsons"],
+        res_by_ssd["spearmans"],
+    )
 
