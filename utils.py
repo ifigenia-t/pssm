@@ -48,6 +48,9 @@ def sd_matrix(df):
     return df_index
 
 
+# Importance Metric
+
+
 def gini_weight(df):
     d = {}
     for col in df.columns:
@@ -67,6 +70,9 @@ def weight_matrix(df):
     df_weighted = df * gini_weight(df)
     df_weighted = df_weighted.round(decimals=2)
     return df_weighted
+
+
+# Similarity Metrics
 
 
 def matrix_equal(df1, df2):
@@ -96,8 +102,35 @@ def euclidian_distance(df1, df2):
     full_eu = math.sqrt(ed_df.fillna(0).values.sum())
     return full_eu
 
+def calc_sum_of_squared_distance(df1,df2):
+  ssds = []
+  for i in range(0, len(df1.columns)):
+      dfi = df1.iloc[:, i]
+      dfj = df2.iloc[:, i]
+      ssd = (dfi - dfj)**2
+      ssd_sum = ssd.sum().round(decimals=3)
+      ssds.append(ssd_sum)
+      ssd_df = pd.DataFrame(ssds)
+      ssd_df = ssd_df.T
+      ssd_df = ssd_df.rename(index={0: "SSD"})
+        
+  return ssd_df
 
-def Kullback_Leibler_distance(df1, df2):
+def calc_dot_product(df1,df2):
+    dot_products = []
+    for i in range(0, len(df1.columns)):
+        dfi = df1.iloc[:, i]
+        dfj = df2.iloc[:, i]
+        dot_product = dfi.values * dfj.values
+        dot_product_sum = dot_product.sum().round(decimals=3)
+        dot_products.append(dot_product_sum)
+        dot_product_df = pd.DataFrame(dot_products)
+        dot_product_df = dot_product_df.T
+        dot_product_df = dot_product_df.rename(index={0: "Dot"})
+    return dot_product_df
+
+
+def calc_Kullback_Leibler_distance(df1, df2):
     """
     Calculates the Kullback-Leibler distance of the two matrices. 
     As defined in Aerts et al. (2003). Also called Mutual Information.
@@ -136,23 +169,54 @@ def calc_pearson_correlation(df1, df2):
         pearson_scale = pearson_scale.round(decimals=3)
 
         pearsons.append(pearson_scale)
-    return pearsons
+
+    pearsons_df = pd.DataFrame(pearsons)
+    pearsons_df = pearsons_df.T
+    pearsons_df = pearsons_df.rename(index={0: "Pearson"})
+
+    return pearsons_df
 
 
-def calc_spearmans_correlation(df1,df2):
+def calc_spearmans_correlation(df1, df2):
     spearmans = []
 
     for i in range(0, len(df1.columns)):
         dfi = df1.iloc[:, i]
         dfj = df2.iloc[:, i]
-        spearman = dfi.corr(dfj, method='spearman')
+        spearman = dfi.corr(dfj, method="spearman")
         spearman = spearman.round(decimals=3)
 
         # Turning the correlation coefficient scale from -1 - 1 to 0-1
         spearmans_scale = (spearman + 1) / 2
         spearmans_scale = spearmans_scale.round(decimals=3)
         spearmans.append(spearmans_scale)
-    return spearmans
+
+    spearman_df = pd.DataFrame(spearmans)
+    spearman_df = spearman_df.T
+    spearman_df = spearman_df.rename(index={0: "Spearman"})
+
+    return spearman_df
+
+
+def calc_kendall_correlation(df1, df2):
+    kendalls = []
+
+    for i in range(0, len(df1.columns)):
+        dfi = df1.iloc[:, i]
+        dfj = df2.iloc[:, i]
+        kendall = dfi.corr(dfj, method="kendall")
+        kendall = kendall.round(decimals=3)
+
+        # Turning the correlation coefficient scale from -1 - 1 to 0-1
+        kendalls_scale = (kendall + 1) / 2
+        kendalls_scale = kendalls_scale.round(decimals=3)
+        kendalls.append(kendalls_scale)
+
+    kendall_df = pd.DataFrame(kendalls)
+    kendall_df = kendall_df.T
+    kendall_df = kendall_df.rename(index={0: "Kendall"})
+
+    return kendall_df
 
 
 def get_df_window(df1, df2, pep_window, i, j):
@@ -170,77 +234,61 @@ def compare_matrix_windowed(df1, df2, pep_window):
     Compares two matrices using a window of comparison and returns a dictionary
     containing the positions of each matrix and the SSD
     """
-    sdfs = {}
+    results = {}
     ssd_sum_dic = {}
     pearsons = {}
     spearmans = {}
+    kendalls = {}
+    dot_products = {}
+    
 
     it_window_a = len(df1.columns) - pep_window
     it_window_b = len(df2.columns) - pep_window
 
     for i in range(0, it_window_a):
         for j in range(0, it_window_b):
-            # print("===> i: {}:{} j: {}:{}".format(i, i + pep_window, j, j + pep_window))
+            key = "{}:{} - {}:{}".format(i, i + pep_window, j, j + pep_window)
             a, b = get_df_window(df1, df2, pep_window, i, j)
 
-            a_gini = gini_weight(a).apply(lambda x: 1 - x)
-            a_gini_df = a_gini.T
-            b_gini = gini_weight(b).apply(lambda x: 1 - x)
-            b_gini_df = b_gini.T
-
-            a_gini_df = pd.DataFrame(np.repeat(a_gini_df.values, len(a.index), axis=0))
-            b_gini_df = pd.DataFrame(np.repeat(b_gini_df.values, len(b.index), axis=0))
-
-            a_all = a * a_gini_df.values
-            b_all = a * b_gini_df.values
-
-            ssd = (a - b) ** 2
-            ssd_sum = ssd.sum()
-            ssd_sum = pd.DataFrame(ssd_sum)
-            ssd_sum = ssd_sum.T
-            ssd_sum = ssd_sum.rename(index={0: "SSD"})
-
-            # 1st way
-            sdf = (a_all - b_all) ** 2
-            sdf = sdf[sdf < sdf.mean()].fillna(1)
+            a_gini_df = gini_weight(a)
+            a_gini_df = a_gini_df.T
+            b_gini_df = gini_weight(b)
+            b_gini_df = b_gini_df.T
 
             pearsons_cor = calc_pearson_correlation(a, b)
             spearmans_cor = calc_spearmans_correlation(a, b)
+            kendalls_cor = calc_kendall_correlation(a, b)
+            dot_product = calc_dot_product(a,b)
+            ssd = calc_sum_of_squared_distance(a,b)
+
+            # TODO make this configurable
+            comparison = pearsons_cor * a_gini_df.values * b_gini_df.values
+        
 
             # Suggested way:
             # SDF as sum(SSD * (1 - gini1) * (1 - gini2))
             # and sum(SSD * (1 - gini1 * gini2))
 
-            # Suggested way 1:
-            # sdf = (ssd_sum * a_gini_df.values * b_gini_df.values)
-
-            # Suggested way 2:
-            # sdf = (ssd_sum * (1-(gini_weight(a).T.values * gini_weight(b).T.values)**2))
-            # print("{}:{} - {}:{}".format(i, i + pep_window, j, j + pep_window))
-            # print("this is ssd: ",ssd_sum)
-            # print("this is gini a ",gini_weight(a).T)
-            # print("this is b " , gini_weight(b).T)
-
-            # print("this is sdf: ",sdf)
-            # print("final sdf:",sdf.fillna(1).values.sum().round(decimals=3))
-            key = "{}:{} - {}:{}".format(i, i + pep_window, j, j + pep_window)
-            sdfs[key] = (
-                sdf.fillna(1).values.sum().round(decimals=3)
-            )
-            ssd_sum_dic[key] = ssd_sum
+            results[key] = comparison.values.sum().round(decimals=3)
+            ssd_sum_dic[key] = ssd
             pearsons[key] = pearsons_cor
             spearmans[key] = spearmans_cor
+            kendalls[key] = kendalls_cor
+            dot_products[key] = dot_product
 
-        sdfs_sorted = sorted(sdfs.items(), key=operator.itemgetter(1))
+        # TODO make order cofigurable
+        results_sorted = sorted(results.items(), key=operator.itemgetter(1), reverse=True)
 
-    sdf_0 = sdfs_sorted[0]
-    if sdf_0[0] in ssd_sum_dic:
-        ssd_print = ssd_sum_dic[sdf_0[0]]
-        pearsons_print = pearsons[sdf_0[0]]
-        spearmans_print = spearmans[sdf_0[0]]
-    #   print(ssd_print)
+    res_0 = results_sorted[0]
+    
+    if res_0[0] in ssd_sum_dic:
+        ssd_res = ssd_sum_dic[res_0[0]]
+        pearsons_res = pearsons[res_0[0]]
+        spearmans_res = spearmans[res_0[0]]
+        kendalls_res = kendalls[res_0[0]]
+        dot_product_res = dot_products[res_0[0]]
 
-    return sdfs_sorted, ssd_print, pearsons_print, spearmans_print
+    return results_sorted, ssd_res, pearsons_res, spearmans_res, kendalls_res, dot_product_res
 
 
 def compare_two_files(base_file, second_file, pep_window):
@@ -257,11 +305,26 @@ def compare_two_files(base_file, second_file, pep_window):
     df2_norm = normalise_matrix(df2)
     # df2_weigthed = weight_matrix(df2_norm)
 
-    ssd = sum_squared_distance_matrix(df1_norm, df2_norm)
+    ssd_global = sum_squared_distance_matrix(df1_norm, df2_norm)
     equality = matrix_equal(df1_norm, df2_norm)
-    sdfs, ssd_print, pearsons, spearmans = compare_matrix_windowed(df1_norm, df2_norm, pep_window)
+    comparison_results, ssd, pearsons, spearmans, kendalls, dot_products = compare_matrix_windowed(
+        df1_norm, df2_norm, pep_window
+    )
 
-    return equality, df1_sd, df2_sd, ssd, sdfs, df1_norm, df2_norm, ssd_print, pearsons, spearmans
+    return (
+        equality,
+        df1_sd,
+        df2_sd,
+        ssd_global,
+        comparison_results,
+        df1_norm,
+        df2_norm,
+        ssd,
+        pearsons,
+        spearmans,
+        kendalls,
+        dot_products
+    )
 
 
 def compare_combined_file(base_file, combined_file, pep_window):
@@ -289,24 +352,28 @@ def compare_combined_file(base_file, combined_file, pep_window):
                     equality,
                     _,
                     _,
-                    ssd,
-                    sdfs,
+                    ssd_global,
+                    comparison_results,
                     df1,
                     df2,
-                    ssd_print,
+                    ssd,
                     pearsons,
                     spearmans,
+                    kendalls,
+                    dot_products
                 ) = compare_two_files(base_file, json_pssm, pep_window)
                 res["equality"] = equality
                 res["base"] = base_file
                 res["second"] = data[pssm]["motif"]
-                res["ssd"] = ssd
-                res["sdf"] = sdfs[0]
+                res["ssd_global"] = ssd_global
+                res["comparison_results"] = comparison_results[0]
                 res["df1"] = df1
                 res["df2"] = df2
-                res["ssd_print"] = ssd_print
+                res["ssd"] = ssd
                 res["pearsons"] = pearsons
                 res["spearmans"] = spearmans
+                res["kendalls"] = kendalls
+                res["dot_products"] = dot_products
                 results.append(res)
 
             except TypeError as ex:
@@ -319,13 +386,12 @@ def compare_combined_file(base_file, combined_file, pep_window):
             bar.update(i)
 
         bar.finish()
-
-        results.sort(key=lambda x: x["sdf"][1])
+        results.sort(key=lambda x: x["comparison_results"][1], reverse=True)
 
         return results
 
 
-def print_df_ranges(df, region, ssd_print, pearsons, spearmans):
+def print_df_ranges(df, region, ssd, pearsons, spearmans, kendalls, dot_products):
     a, b = region.split(":")
     gini = gini_weight(df)
     gini = gini.T
@@ -333,20 +399,19 @@ def print_df_ranges(df, region, ssd_print, pearsons, spearmans):
     new_df = new_df.rename(index={0: "Gini"})
 
     column_list = list(range(int(a), int(b) + 1))
-    ssd_print.columns = column_list
-    new_df = new_df.append(ssd_print)
+    ssd.columns = column_list
+    new_df = new_df.append(ssd)
 
-    pearsons_df = pd.DataFrame(pearsons)
-    pearsons_df = pearsons_df.T
-    pearsons_df = pearsons_df.rename(index={0: "Pearson"})
-    pearsons_df.columns = column_list
-    new_df = new_df.append(pearsons_df)
+    pearsons.columns = column_list
+    new_df = new_df.append(pearsons)
 
-    spearmans_df = pd.DataFrame(spearmans)
-    spearmans_df = spearmans_df.T
- 
-    spearmans_df = spearmans_df.rename(index={0: "Spearman"})
-    spearmans_df.columns = column_list
-    new_df = new_df.append(spearmans_df)
+    spearmans.columns = column_list
+    new_df = new_df.append(spearmans)
+
+    kendalls.columns = column_list
+    new_df = new_df.append(kendalls)
+
+    dot_products.columns = column_list
+    new_df = new_df.append(dot_products)
 
     print(new_df.loc[:, int(a) : int(b)])

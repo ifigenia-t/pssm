@@ -29,13 +29,15 @@ if args.second_file:
         equality,
         f1_sd,
         f2_sd,
-        ssd,
-        sdfs,
+        ssd_global,
+        comparison_results,
         df1,
         df2,
-        ssd_print,
+        ssd,
         pearsons,
-        spearmans
+        spearmans,
+        kendalls,
+        dot_products
     ) = compare_two_files(base_file, second_file, pep_window)
     print("Positions with significant SD for file: {} are: {}".format(base_file, f1_sd))
     print(
@@ -43,51 +45,59 @@ if args.second_file:
     )
     print("Dataframes equal: {} ".format(equality))
     print("Sum of square distance: {}".format(ssd))
-    res_by_sdf = sdfs[0]
-    regions = res_by_sdf[0]
+
+    res_best = comparison_results[0]
+    regions = res_best[0]
     region_a, region_b = regions.split(" - ")
-    print("{} ===> {}".format(res_by_sdf[0], res_by_sdf[1]))
-    print_df_ranges(df1, region_a, ssd_print, pearsons, spearmans)
-    print_df_ranges(df2, region_b, ssd_print, pearsons, spearmans)
+
+    print("{} ===> {}".format(res_best[0], res_best[1]))
+    print_df_ranges(df1, region_a, ssd, pearsons, spearmans, kendalls, dot_products)
+    print_df_ranges(df2, region_b, ssd, pearsons, spearmans, kendalls, dot_products)
 
 if args.combined_file:
     combined_file = args.combined_file
     results = compare_combined_file(base_file, combined_file, pep_window)
 
-    res_by_sdf = results[0]
-    results.sort(key=lambda x: x["ssd"])
-    res_by_ssd = results[0]
-    regions = res_by_sdf["sdf"][0]
+    res_best = results[0]
+
+    # results.sort(key=lambda x: x["ssd"])
+    # res_by_ssd = results[0]
+
+    regions = res_best["comparison_results"][0]
     region_a, region_b = regions.split(" - ")
 
+    # print(
+    #     "---> Whole Matrix Comparisons = Base: {} Second: {} SSD: {} SDF: {}".format(
+    #         res_by_ssd["base"],
+    #         res_by_ssd["second"],
+    #         res_by_ssd["ssd_global"],
+    #         res_by_ssd["sdf"],
+    #     )
+    # )
     print(
         "---> Window Calculations = Base: {} Second: {} SSD: {} SDF: {}".format(
-            res_by_sdf["base"],
-            res_by_sdf["second"],
-            res_by_sdf["ssd"],
-            res_by_sdf["sdf"],
-        )
-    )
-    print(
-        "---> Whole Matrix Comparisons = Base: {} Second: {} SSD: {} SDF: {}".format(
-            res_by_ssd["base"],
-            res_by_ssd["second"],
-            res_by_ssd["ssd"],
-            res_by_ssd["sdf"],
+            res_best["base"],
+            res_best["second"],
+            res_best["ssd_global"],
+            res_best["comparison_results"],
         )
     )
     print_df_ranges(
-        res_by_sdf["df1"],
+        res_best["df1"],
         region_a,
-        res_by_ssd["ssd_print"],
-        res_by_ssd["pearsons"],
-        res_by_ssd["spearmans"],
+        res_best["ssd"],
+        res_best["pearsons"],
+        res_best["spearmans"],
+        res_best["kendalls"],
+        res_best["dot_products"]
     )
     print_df_ranges(
-        res_by_sdf["df2"],
+        res_best["df2"],
         region_b,
-        res_by_ssd["ssd_print"],
-        res_by_ssd["pearsons"],
-        res_by_ssd["spearmans"],
+        res_best["ssd"],
+        res_best["pearsons"],
+        res_best["spearmans"],
+        res_best["kendalls"],
+        res_best["dot_products"]
     )
 
