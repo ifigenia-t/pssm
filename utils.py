@@ -34,6 +34,7 @@ def normalise_matrix(df):
     normalized_df = df - df.min()
     normalized_df = normalized_df / normalized_df.sum()
     normalized_df = normalized_df.round(decimals=2)
+    normalized_df = normalized_df.sort_index(axis = 0) 
     return normalized_df
 
 
@@ -131,16 +132,25 @@ def calc_dot_product(df1,df2):
 
 
 def calc_Kullback_Leibler_distance(df1, df2):
-    """
-    Calculates the Kullback-Leibler distance of the two matrices. 
-    As defined in Aerts et al. (2003). Also called Mutual Information.
-    Sort will be ascending.
-    """
-    kld_df = df1 * math.log(sum(df1 / df2))
-    kld_df = kld_df.dropna(axis=1, how="all")
-    full_kld = sum(kld_df)
-    return full_kld
-
+  """
+  Calculates the Kullback-Leibler distance of the two matrices. 
+  As defined in Aerts et al. (2003). Also called Mutual Information.
+  Sort will be ascending.
+  Epsilon is used here to avoid conditional code for checking that neither P nor Q is equal to 0.
+  """
+  epsilon = 0.00001
+  kl = []
+  for i in range(0, len(df1.columns)):
+      dfi = df1.iloc[:, i]
+      dfj = df2.iloc[:, i]
+      P = dfi + epsilon
+      Q = dfj + epsilon
+      divergence = np.sum(P * np.log2(P/ Q))
+      kl.append(divergence)
+      kl_df = pd.DataFrame(kl)
+      kl_df = kl_df.T.round(decimals = 3)
+      kl_df = kl_df.rename(index={0: "kl"})
+  return kl_df
 
 def correlation_coefficient(df1, df2):
     """
@@ -240,6 +250,7 @@ def compare_matrix_windowed(df1, df2, pep_window):
     spearmans = {}
     kendalls = {}
     dot_products = {}
+    kl_divergence = {}
     
 
     it_window_a = len(df1.columns) - pep_window
@@ -260,6 +271,7 @@ def compare_matrix_windowed(df1, df2, pep_window):
             kendalls_cor = calc_kendall_correlation(a, b)
             dot_product = calc_dot_product(a,b)
             ssd = calc_sum_of_squared_distance(a,b)
+            kl = calc_Kullback_Leibler_distance(a,b)
 
             # TODO make this configurable
             comparison = pearsons_cor * a_gini_df.values * b_gini_df.values
@@ -275,6 +287,7 @@ def compare_matrix_windowed(df1, df2, pep_window):
             spearmans[key] = spearmans_cor
             kendalls[key] = kendalls_cor
             dot_products[key] = dot_product
+            kl_divergence[key] = kl
 
         # TODO make order cofigurable
         results_sorted = sorted(results.items(), key=operator.itemgetter(1), reverse=True)
@@ -287,8 +300,9 @@ def compare_matrix_windowed(df1, df2, pep_window):
         spearmans_res = spearmans[res_0[0]]
         kendalls_res = kendalls[res_0[0]]
         dot_product_res = dot_products[res_0[0]]
+        kl_divergence_res = kl_divergence[res_0[0]]
 
-    return results_sorted, ssd_res, pearsons_res, spearmans_res, kendalls_res, dot_product_res
+    return results_sorted, ssd_res, pearsons_res, spearmans_res, kendalls_res, dot_product_res, kl_divergence_res
 
 
 def compare_two_files(base_file, second_file, pep_window):
@@ -307,7 +321,7 @@ def compare_two_files(base_file, second_file, pep_window):
 
     ssd_global = sum_squared_distance_matrix(df1_norm, df2_norm)
     equality = matrix_equal(df1_norm, df2_norm)
-    comparison_results, ssd, pearsons, spearmans, kendalls, dot_products = compare_matrix_windowed(
+    comparison_results, ssd, pearsons, spearmans, kendalls, dot_products, kl_divergence = compare_matrix_windowed(
         df1_norm, df2_norm, pep_window
     )
 
@@ -323,7 +337,8 @@ def compare_two_files(base_file, second_file, pep_window):
         pearsons,
         spearmans,
         kendalls,
-        dot_products
+        dot_products,
+        kl_divergence
     )
 
 
@@ -360,7 +375,8 @@ def compare_combined_file(base_file, combined_file, pep_window):
                     pearsons,
                     spearmans,
                     kendalls,
-                    dot_products
+                    dot_products,
+                    kl_divergence
                 ) = compare_two_files(base_file, json_pssm, pep_window)
                 res["equality"] = equality
                 res["base"] = base_file
@@ -374,6 +390,7 @@ def compare_combined_file(base_file, combined_file, pep_window):
                 res["spearmans"] = spearmans
                 res["kendalls"] = kendalls
                 res["dot_products"] = dot_products
+                res["kl_divergence"] = kl_divergence
                 results.append(res)
 
             except TypeError as ex:
@@ -391,7 +408,7 @@ def compare_combined_file(base_file, combined_file, pep_window):
         return results
 
 
-def print_df_ranges(df, region, ssd, pearsons, spearmans, kendalls, dot_products):
+def print_df_ranges(df, region, ssd, pearsons, spearmans, kendalls, dot_products, kl_divergence):
     a, b = region.split(":")
     gini = gini_weight(df)
     gini = gini.T
@@ -414,4 +431,7 @@ def print_df_ranges(df, region, ssd, pearsons, spearmans, kendalls, dot_products
     dot_products.columns = column_list
     new_df = new_df.append(dot_products)
 
+    kl_divergence.columns = column_list
+    new_df = new_df.append(kl_divergence)
+    
     print(new_df.loc[:, int(a) : int(b)])

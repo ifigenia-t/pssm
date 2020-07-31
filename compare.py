@@ -37,22 +37,23 @@ if args.second_file:
         pearsons,
         spearmans,
         kendalls,
-        dot_products
+        dot_products,
+        kl_divergence
     ) = compare_two_files(base_file, second_file, pep_window)
     print("Positions with significant SD for file: {} are: {}".format(base_file, f1_sd))
     print(
         "Positions with significant SD for file: {} are: {}".format(second_file, f2_sd)
     )
     print("Dataframes equal: {} ".format(equality))
-    print("Sum of square distance: {}".format(ssd))
+    print("Sum of square distance: {}".format(ssd_global))
 
     res_best = comparison_results[0]
     regions = res_best[0]
     region_a, region_b = regions.split(" - ")
 
     print("{} ===> {}".format(res_best[0], res_best[1]))
-    print_df_ranges(df1, region_a, ssd, pearsons, spearmans, kendalls, dot_products)
-    print_df_ranges(df2, region_b, ssd, pearsons, spearmans, kendalls, dot_products)
+    print_df_ranges(df1, region_a, ssd, pearsons, spearmans, kendalls, dot_products, kl_divergence)
+    print_df_ranges(df2, region_b, ssd, pearsons, spearmans, kendalls, dot_products, kl_divergence)
 
 if args.combined_file:
     combined_file = args.combined_file
@@ -74,8 +75,13 @@ if args.combined_file:
     #         res_by_ssd["sdf"],
     #     )
     # )
+
+    # for result in results:
+    #     print("Comparison Score = {}, ELM motif = {}".format(result["comparison_results"], result["second"]))
+    
+    
     print(
-        "---> Window Calculations = Base: {} Second: {} SSD: {} SDF: {}".format(
+        "---> Window Calculations = Base: {} Second: {} SSD: {} Comparison: {}".format(
             res_best["base"],
             res_best["second"],
             res_best["ssd_global"],
@@ -89,7 +95,8 @@ if args.combined_file:
         res_best["pearsons"],
         res_best["spearmans"],
         res_best["kendalls"],
-        res_best["dot_products"]
+        res_best["dot_products"],
+        res_best["kl_divergence"]
     )
     print_df_ranges(
         res_best["df2"],
@@ -98,6 +105,7 @@ if args.combined_file:
         res_best["pearsons"],
         res_best["spearmans"],
         res_best["kendalls"],
-        res_best["dot_products"]
+        res_best["dot_products"],
+        res_best["kl_divergence"]
     )
 
