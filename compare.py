@@ -1,12 +1,12 @@
 import argparse
 
-from utils import compare_combined_file, compare_two_files, print_df_ranges
+from utils import compare_combined_file, compare_two_files, print_df_ranges, compare_single_file
 
 pep_window = 4
 
 parser = argparse.ArgumentParser(description="")
 parser.add_argument(
-    "--base_file", "-bf", help="base file to be used for the comparison", required=True
+    "--base_file", "-bf", help="base file to be used for the comparison",
 )
 parser.add_argument(
     "--second_file", "-sf", help="file to be used for the comparison",
@@ -16,12 +16,22 @@ parser.add_argument(
     "-cf",
     help="file that contains multile json objects to be used for the comparison",
 )
+parser.add_argument(
+    "--single_file",
+    "-sif",
+    help="file that contains multile json objects to be used for the comparison with each other",
+)
 args = parser.parse_args()
 
-if (not args.second_file) and (not args.combined_file):
-    parser.error("--second_file or --combined_file need to be defined")
 
-base_file = args.base_file
+if args.base_file:
+    if (not args.second_file) and (not args.combined_file):
+        parser.error("--second_file or --combined_file need to be defined")
+
+    base_file = args.base_file
+
+elif args.second_file or args.combined_file:
+    parser.error("--base_file needs to be defined")
 
 if args.second_file:
     second_file = args.second_file
@@ -38,7 +48,7 @@ if args.second_file:
         spearmans,
         kendalls,
         dot_products,
-        kl_divergence
+        kl_divergence,
     ) = compare_two_files(base_file, second_file, pep_window)
     print("Positions with significant SD for file: {} are: {}".format(base_file, f1_sd))
     print(
@@ -52,8 +62,12 @@ if args.second_file:
     region_a, region_b = regions.split(" - ")
 
     print("{} ===> {}".format(res_best[0], res_best[1]))
-    print_df_ranges(df1, region_a, ssd, pearsons, spearmans, kendalls, dot_products, kl_divergence)
-    print_df_ranges(df2, region_b, ssd, pearsons, spearmans, kendalls, dot_products, kl_divergence)
+    print_df_ranges(
+        df1, region_a, ssd, pearsons, spearmans, kendalls, dot_products, kl_divergence
+    )
+    print_df_ranges(
+        df2, region_b, ssd, pearsons, spearmans, kendalls, dot_products, kl_divergence
+    )
 
 if args.combined_file:
     combined_file = args.combined_file
@@ -78,8 +92,7 @@ if args.combined_file:
 
     # for result in results:
     #     print("Comparison Score = {}, ELM motif = {}".format(result["comparison_results"], result["second"]))
-    
-    
+
     print(
         "---> Window Calculations = Base: {} Second: {} SSD: {} Comparison: {}".format(
             res_best["base"],
@@ -96,7 +109,7 @@ if args.combined_file:
         res_best["spearmans"],
         res_best["kendalls"],
         res_best["dot_products"],
-        res_best["kl_divergence"]
+        res_best["kl_divergence"],
     )
     print_df_ranges(
         res_best["df2"],
@@ -106,6 +119,12 @@ if args.combined_file:
         res_best["spearmans"],
         res_best["kendalls"],
         res_best["dot_products"],
-        res_best["kl_divergence"]
+        res_best["kl_divergence"],
     )
 
+if args.single_file:
+    single_file = args.single_file
+    results = compare_single_file(single_file, pep_window)
+
+    for result in results:
+         print("1st PSSM = {}, 2nd PSSM = {}, Comparison Score = {}".format(result["base"], result["second"], result["comparison_results"]))
