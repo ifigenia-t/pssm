@@ -13,6 +13,7 @@ pd.set_option("display.max_rows", 500)
 pd.set_option("display.max_columns", 500)
 pd.set_option("display.width", 1000)
 
+buffer = 1
 
 class NoResultsError(Exception):
     pass
@@ -43,6 +44,7 @@ def normalise_matrix(df):
     return normalized_df
 
 
+# Importance Metric
 def sd_matrix(df):
     """
     Calculates the Standard Deviation of each column and returns a dictionary 
@@ -53,8 +55,6 @@ def sd_matrix(df):
     df_index = [ind for ind in df_std.index]
     return df_index
 
-
-# Importance Metric
 def gini_weight(df):
     """
     Calculates the Gini Coefficient which is a measure of statistical dispersion.
@@ -81,8 +81,52 @@ def weight_matrix(df):
     return df_weighted
 
 
-# Similarity Metrics
+# Calculation of the peptide window
+def calc_brute_force_window(df1, df2):
+    """
+    Calculates a list of possible windows for the comparison of two.
+    """
+    max_diff = 0
+    if len(df1.columns) > len(df2.columns):
+        max_diff = len(df2.columns)
+    else:
+        max_diff = len(df1.columns)
+    return [x for x in range(1, max_diff + 1)]
 
+def gini_window_index(df):
+    """
+    Finds all the important positions of a PSSM. Important positions are all
+    the positions that have a gini larger than the (mean + SD) of all the ginis.
+    """
+    gini_df = gini_weight(df)
+    print(gini_df)
+    gini_window = gini_df[gini_df > gini_df.mean()+gini_df.std()]
+    gini_window.dropna(inplace=True)
+    gini_window_index = [ind for ind in gini_window.index]
+    return gini_window_index
+
+
+def calc_gini_windows(df1,df2):
+    """
+    Calculates the list of all the windows for the comparison of the 2 PSSMs,
+    according to their important positions.
+    """
+    index_1 = gini_window_index(df1)
+    index_2 = gini_window_index(df2)
+    print(index_1)
+    print(index_2)
+    if len(df1.columns) < len(df2.columns):
+        min_window = max(index_1) - min(index_1) + buffer
+        max_window = max(index_2) - min(index_2) + buffer
+    else:
+        min_window = max(index_2) - min(index_2) + buffer
+        max_window = max(index_1) - min(index_1) + buffer
+
+    windows_list = [x for x in range(min_window, max_window + 1)]
+    return windows_list
+
+
+# Similarity Metrics
 def matrix_equal(df1, df2):
     """
     Returns a boolean whether two matrices are equal
@@ -109,6 +153,7 @@ def euclidian_distance(df1, df2):
     ed_df = ed_df.dropna(axis=1, how="all")
     full_eu = math.sqrt(ed_df.fillna(0).values.sum())
     return full_eu
+
 
 def correlation_coefficient(df1, df2):
     """
@@ -257,17 +302,19 @@ def calculate_similarity(df1, df2):
 
     return kendalls_df, pearsons_df, spearmans_df, dots_df, ssds_df, kls_df
 
+
 def get_df_window(df1, df2, pep_window, i, j):
     """
     Slices the dataframes according to a given window size.
     """
-    a = df1.loc[:, i : i + pep_window -1]
-    b = df2.loc[:, j : j + pep_window -1]
+    a = df1.loc[:, i : i + pep_window - 1]
+    b = df2.loc[:, j : j + pep_window - 1]
 
     a.columns = [ind for ind in range(0, len(a.columns))]
     b.columns = [ind for ind in range(0, len(b.columns))]
 
     return a, b
+
 
 def compare_matrix_windowed(df1, df2, pep_window):
     """
@@ -286,9 +333,9 @@ def compare_matrix_windowed(df1, df2, pep_window):
     it_window_a = len(df1.columns) - pep_window
     it_window_b = len(df2.columns) - pep_window
 
-    for i in range(0, it_window_a+1):
-        for j in range(0, it_window_b+1):
-            key = "{}:{} - {}:{}".format(i, i + pep_window-1, j, j + pep_window-1)
+    for i in range(0, it_window_a + 1):
+        for j in range(0, it_window_b + 1):
+            key = "{}:{} - {}:{}".format(i, i + pep_window - 1, j, j + pep_window - 1)
             a, b = get_df_window(df1, df2, pep_window, i, j)
 
             a_gini_df = gini_weight(a)

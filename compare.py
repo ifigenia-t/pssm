@@ -1,11 +1,13 @@
 import argparse
 import operator
 
-from utils import (calc_brute_force_window, compare_combined_file,
-                   compare_single_file, compare_two_files, prepare_matrix,
+from utils import (calc_brute_force_window, calc_gini_windows,
+                   compare_combined_file, compare_single_file,
+                   compare_two_files, normalise_matrix, prepare_matrix,
                    print_df_ranges)
 
 # pep_window = 4
+buffer = 1
 
 parser = argparse.ArgumentParser(description="")
 parser.add_argument(
@@ -46,12 +48,16 @@ if args.second_file:
     df2 = prepare_matrix(second_file)
     df1 = prepare_matrix(base_file)
 
+    df1 = normalise_matrix(df1)
+    df2 = normalise_matrix(df2)
+
     pep_windows = []
 
     try:
         pep_window
     except:
-        pep_windows = calc_brute_force_window(df1,df2)
+        pep_windows = calc_gini_windows(df1,df2)
+        print("Pep_windows: ", pep_windows)
     else:
         pep_windows.append(int(pep_window))
 
@@ -97,7 +103,7 @@ if args.second_file:
     opt_window_ordered = sorted(norm_opt_window.items(), key=lambda x: x[1], reverse=True)
     print(optimal_window)
     print("Optimal window normalised: ", norm_opt_window)
-    print("Best window ", opt_window_ordered[0])
+    print("Best window ", opt_window_ordered[0], "\n")
 
 
 if args.combined_file:
