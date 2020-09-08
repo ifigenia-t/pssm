@@ -483,6 +483,10 @@ def compare_combined_file(base_file, combined_file, pep_window):
                     df2 = normalise_matrix(df2)
                     pep_windows = calc_gini_windows(df1,df2)
                     index_1 = gini_window_index(df1)
+                    min_window = max(index_1) - min(index_1) +1 
+                    print("min_window is ", min_window)
+                    if min_window > len(df2.columns):
+                        min_window = len(df2.columns)
                     index_2 = gini_window_index(df2)
                     if len(index_2) == 1:
                         one_window += 1
@@ -493,40 +497,41 @@ def compare_combined_file(base_file, combined_file, pep_window):
                 print("pep_windows: ",pep_windows)
 
                 for window in pep_windows:
-                    res = {}
-                    (
-                        equality,
-                        _,
-                        _,
-                        ssd_global,
-                        comparison_results,
-                        df1,
-                        df2,
-                        ssd,
-                        pearsons,
-                        spearmans,
-                        kendalls,
-                        dot_products,
-                        kl_divergence,
-                    ) = compare_two_files(base_file, json_pssm, window)
-                    res["equality"] = equality
-                    res["base"] = base_file
-                    res["second"] = data[pssm]["motif"]
-                    res["ssd_global"] = ssd_global
-                    res["comparison_results"] = comparison_results[0]
-                    res["df1"] = df1
-                    res["df2"] = df2
-                    res["ssd"] = ssd
-                    res["pearsons"] = pearsons
-                    res["spearmans"] = spearmans
-                    res["kendalls"] = kendalls
-                    res["dot_products"] = dot_products
-                    res["kl_divergence"] = kl_divergence
-                    res["pep_window"] = window
-                    res["norm_window"] = comparison_results[0][1] / window
-                    results.append(res)
-                    print("second: ",res["second"],"window ", window, " comparison ",comparison_results[0][1])
-                    print("Norm_window: ", res["norm_window"])
+                    if window >= min_window:
+                        res = {}
+                        (
+                            equality,
+                            _,
+                            _,
+                            ssd_global,
+                            comparison_results,
+                            df1,
+                            df2,
+                            ssd,
+                            pearsons,
+                            spearmans,
+                            kendalls,
+                            dot_products,
+                            kl_divergence,
+                        ) = compare_two_files(base_file, json_pssm, window)
+                        res["equality"] = equality
+                        res["base"] = base_file
+                        res["second"] = data[pssm]["motif"]
+                        res["ssd_global"] = ssd_global
+                        res["comparison_results"] = comparison_results[0]
+                        res["df1"] = df1
+                        res["df2"] = df2
+                        res["ssd"] = ssd
+                        res["pearsons"] = pearsons
+                        res["spearmans"] = spearmans
+                        res["kendalls"] = kendalls
+                        res["dot_products"] = dot_products
+                        res["kl_divergence"] = kl_divergence
+                        res["pep_window"] = window
+                        res["norm_window"] = comparison_results[0][1] / window
+                        results.append(res)
+                        print("second: ",res["second"],"window ", window, " comparison ",comparison_results[0][1])
+                        print("Norm_window: ", res["norm_window"])
             except TypeError as ex:
                 print("error: {} on pssm: {}".format(ex, pssm))
             except IndexError as ex:
