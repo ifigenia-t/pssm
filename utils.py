@@ -99,7 +99,6 @@ def gini_window_index(df):
     the positions that have a gini larger than the (mean + SD) of all the ginis.
     """
     gini_df = gini_weight(df)
-    print(gini_df)
     gini_window = gini_df[gini_df > gini_df.mean()+gini_df.std()]
     gini_window.dropna(inplace=True)
     gini_window_index = [ind for ind in gini_window.index]
@@ -113,16 +112,33 @@ def calc_gini_windows(df1,df2):
     """
     index_1 = gini_window_index(df1)
     index_2 = gini_window_index(df2)
-    print(index_1)
-    print(index_2)
-    if len(df1.columns) < len(df2.columns):
-        min_window = max(index_1) - min(index_1) + buffer
-        max_window = max(index_2) - min(index_2) + buffer
-    else:
-        min_window = max(index_2) - min(index_2) + buffer
-        max_window = max(index_1) - min(index_1) + buffer
+    print("Index_1: ",index_1)
+    print("Index_2: ",index_2)
+    
+    windows_list = []
 
-    windows_list = [x for x in range(min_window, max_window + 1)]
+    if len(index_1) != 0 and len(index_2) != 0:
+        if len(index_1) == 1:
+            window = max(index_2) - min(index_2) + buffer
+            windows_list.append(window)
+        elif len(index_2) == 1:
+            window = max(index_1) - min(index_1) + buffer
+            windows_list.append(window)
+        else:
+            if len(df1.columns) <= len(df2.columns):
+                min_window = max(index_1) - min(index_1) + buffer
+                max_window = max(index_2) - min(index_2) + buffer
+            else:
+                min_window = max(index_2) - min(index_2) + buffer
+                max_window = max(index_1) - min(index_1) + buffer
+            windows_list = [x for x in range(min_window, max_window + 1)]
+    elif len(index_1) == 0 or len(index_2) == 0:
+            cindex = index_1 + index_2
+            max_window = min_window = max(cindex) - min(cindex) + buffer
+            windows_list = [x for x in range(min_window, max_window + 1)]
+    else:
+       windows_list = calc_brute_force_window(df1, df2)
+
     return windows_list
 
 
@@ -449,58 +465,87 @@ def compare_combined_file(base_file, combined_file, pep_window):
     Calculate all the comparisons for a PSSM and a .json file cointaing multiple
     PSSMs
     """
-
+    results = []
+    one_window = 0
     with open(combined_file) as json_file:
         data = json.load(json_file)
 
-        results = []
-
-        i = 0
-
         for pssm in tqdm(data):
-            res = {}
             try:
                 json_pssm = json.dumps(data[pssm]["pssm"])
-                (
-                    equality,
-                    _,
-                    _,
-                    ssd_global,
-                    comparison_results,
-                    df1,
-                    df2,
-                    ssd,
-                    pearsons,
-                    spearmans,
-                    kendalls,
-                    dot_products,
-                    kl_divergence,
-                ) = compare_two_files(base_file, json_pssm, pep_window)
-                res["equality"] = equality
-                res["base"] = base_file
-                res["second"] = data[pssm]["motif"]
-                res["ssd_global"] = ssd_global
-                res["comparison_results"] = comparison_results[0]
-                res["df1"] = df1
-                res["df2"] = df2
-                res["ssd"] = ssd
-                res["pearsons"] = pearsons
-                res["spearmans"] = spearmans
-                res["kendalls"] = kendalls
-                res["dot_products"] = dot_products
-                res["kl_divergence"] = kl_divergence
-                results.append(res)
+                print("-----> ", data[pssm]["motif"])
 
+                pep_windows = []
+                if pep_window is 0:
+                    df2 = prepare_matrix(json_pssm)
+                    df1 = prepare_matrix(base_file)
+                    df1 = normalise_matrix(df1)
+                    df2 = normalise_matrix(df2)
+                    pep_windows = calc_gini_windows(df1,df2)
+                    index_1 = gini_window_index(df1)
+                    index_2 = gini_window_index(df2)
+                    if len(index_2) == 1:
+                        one_window += 1
+                else:
+                    pep_windows.append(int(pep_window))
+
+
+                print("pep_windows: ",pep_windows)
+
+                for window in pep_windows:
+                    res = {}
+                    (
+                        equality,
+                        _,
+                        _,
+                        ssd_global,
+                        comparison_results,
+                        df1,
+                        df2,
+                        ssd,
+                        pearsons,
+                        spearmans,
+                        kendalls,
+                        dot_products,
+                        kl_divergence,
+                    ) = compare_two_files(base_file, json_pssm, window)
+                    res["equality"] = equality
+                    res["base"] = base_file
+                    res["second"] = data[pssm]["motif"]
+                    res["ssd_global"] = ssd_global
+                    res["comparison_results"] = comparison_results[0]
+                    res["df1"] = df1
+                    res["df2"] = df2
+                    res["ssd"] = ssd
+                    res["pearsons"] = pearsons
+                    res["spearmans"] = spearmans
+                    res["kendalls"] = kendalls
+                    res["dot_products"] = dot_products
+                    res["kl_divergence"] = kl_divergence
+                    res["pep_window"] = window
+                    res["norm_window"] = comparison_results[0][1] / window
+                    results.append(res)
+                    print("second: ",res["second"],"window ", window, " comparison ",comparison_results[0][1])
+                    print("Norm_window: ", res["norm_window"])
             except TypeError as ex:
                 print("error: {} on pssm: {}".format(ex, pssm))
-
             except IndexError as ex:
                 print("error: {} on pssm: {}, res: {} ".format(ex, pssm, res))
             except NoResultsError as ex:
                 print("error: {} on pssm: {}".format(ex, pssm))
                 continue
+            #norm_opt_window = {k: v / k for k, v in optimal_window.items()}
+            #results.sort(key=lambda x: x["comparison_results"][1], reverse=True)
+        
 
-        results.sort(key=lambda x: x["comparison_results"][1], reverse=True)
+        results.sort(key=lambda x: float(x["norm_window"]), reverse=True)
+        print("Results with 1 important position: ", one_window)
+        print("len_results= ",len(results))
+        print("\nNormalised Window Values     Original window")
+        for res in results:
+            print("second: ",res["second"],"Norm Window Values", res["norm_window"], "Original window ",res["pep_window"])
+        print("\n")
+
 
         return results
 
@@ -520,7 +565,7 @@ def compare_single_file(single_file, pep_window):
 
         df = pd.DataFrame(columns=col_names, index=col_names)
 
-        i = 0
+        #i = 0
 
         for pssm_i in tqdm(data):
 
