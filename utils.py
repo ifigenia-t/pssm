@@ -128,9 +128,13 @@ def calc_gini_windows(df1,df2):
             if len(df1.columns) <= len(df2.columns):
                 min_window = max(index_1) - min(index_1) + buffer
                 max_window = max(index_2) - min(index_2) + buffer
+                if min_window > max_window:
+                    max_window = min_window
             else:
                 min_window = max(index_2) - min(index_2) + buffer
                 max_window = max(index_1) - min(index_1) + buffer
+                if min_window > max_window:
+                    max_window = min_window
             windows_list = [x for x in range(min_window, max_window + 1)]
     elif len(index_1) == 0 or len(index_2) == 0:
             cindex = index_1 + index_2
@@ -470,6 +474,14 @@ def compare_combined_file(base_file, combined_file, pep_window):
     with open(combined_file) as json_file:
         data = json.load(json_file)
 
+        # TODO find a way not have to use this
+        index_names = []
+        for elm in data:
+            index_names.append(data[elm]["motif"])
+
+        col_names = ["No Important Positions","Windows","Comparison Results","Norm. Window"]
+        df = pd.DataFrame(columns=col_names, index=index_names)
+
         for pssm in tqdm(data):
             try:
                 json_pssm = json.dumps(data[pssm]["pssm"])
@@ -532,6 +544,9 @@ def compare_combined_file(base_file, combined_file, pep_window):
                         results.append(res)
                         print("second: ",res["second"],"window ", window, " comparison ",comparison_results[0][1])
                         print("Norm_window: ", res["norm_window"])
+
+                        df.loc[res["second"]] = [len(index_2), window, comparison_results[0][1], res["norm_window"]]
+
             except TypeError as ex:
                 print("error: {} on pssm: {}".format(ex, pssm))
             except IndexError as ex:
@@ -542,6 +557,9 @@ def compare_combined_file(base_file, combined_file, pep_window):
             #norm_opt_window = {k: v / k for k, v in optimal_window.items()}
             #results.sort(key=lambda x: x["comparison_results"][1], reverse=True)
         
+        
+        df.to_csv("comb_ELM.csv")
+          
 
         results.sort(key=lambda x: float(x["norm_window"]), reverse=True)
         print("Results with 1 important position: ", one_window)
@@ -570,7 +588,6 @@ def compare_single_file(single_file, pep_window):
 
         df = pd.DataFrame(columns=col_names, index=col_names)
 
-        #i = 0
 
         for pssm_i in tqdm(data):
 
