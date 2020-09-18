@@ -1,10 +1,18 @@
 import argparse
 import operator
 
-from utils import (calc_brute_force_window, calc_gini_windows,
-                   compare_combined_file, compare_single_file,
-                   compare_two_files, normalise_matrix, prepare_matrix,
-                   print_df_ranges)
+from utils import (
+    calc_brute_force_window,
+    calc_gini_windows,
+    compare_combined_file,
+    compare_single_file,
+    compare_two_combined,
+    compare_two_files,
+    normalise_matrix,
+    prepare_matrix,
+    print_df_ranges,
+    plot_important_positions,
+)
 
 # pep_window = 4
 buffer = 1
@@ -26,12 +34,24 @@ parser.add_argument(
     "-sif",
     help="file that contains multile json objects to be used for the comparison with each other",
 )
-parser.add_argument("--peptide_window", "-pw", help="The length of the window of the PSSM comparison")
+
+parser.add_argument(
+    "--two_comb_files",
+    "-two",
+    help="Two files that contain multiple json objects to be used for comparison with each other",
+    action="append",
+)
+
+parser.add_argument(
+    "--peptide_window", "-pw", help="The length of the window of the PSSM comparison"
+)
+parser.add_argument(
+    "--boxplot", "-box", help="Boxplot the important vs the unimportant positions"
+)
 args = parser.parse_args()
 
 if args.peptide_window:
     pep_window = args.peptide_window
- 
 
 
 if args.base_file:
@@ -56,7 +76,7 @@ if args.second_file:
     try:
         pep_window
     except:
-        pep_windows = calc_gini_windows(df1,df2)
+        pep_windows = calc_gini_windows(df1, df2)
         print("Pep_windows: ", pep_windows)
     else:
         pep_windows.append(int(pep_window))
@@ -79,9 +99,15 @@ if args.second_file:
             dot_products,
             kl_divergence,
         ) = compare_two_files(base_file, second_file, window)
-        print("Positions with significant SD for file: {} are: {}".format(base_file, f1_sd))
         print(
-            "Positions with significant SD for file: {} are: {}".format(second_file, f2_sd)
+            "Positions with significant SD for file: {} are: {}".format(
+                base_file, f1_sd
+            )
+        )
+        print(
+            "Positions with significant SD for file: {} are: {}".format(
+                second_file, f2_sd
+            )
         )
         print("Dataframes equal: {} ".format(equality))
         print("Sum of square distance: {}".format(ssd_global))
@@ -90,17 +116,33 @@ if args.second_file:
         regions = res_best[0]
         region_a, region_b = regions.split(" - ")
 
-        optimal_window[window] = res_best[1]    
+        optimal_window[window] = res_best[1]
 
         print("{} ===> {}".format(res_best[0], res_best[1]))
         print_df_ranges(
-            df1, region_a, ssd, pearsons, spearmans, kendalls, dot_products, kl_divergence
+            df1,
+            region_a,
+            ssd,
+            pearsons,
+            spearmans,
+            kendalls,
+            dot_products,
+            kl_divergence,
         )
         print_df_ranges(
-            df2, region_b, ssd, pearsons, spearmans, kendalls, dot_products, kl_divergence
+            df2,
+            region_b,
+            ssd,
+            pearsons,
+            spearmans,
+            kendalls,
+            dot_products,
+            kl_divergence,
         )
     norm_opt_window = {k: v / k for k, v in optimal_window.items()}
-    opt_window_ordered = sorted(norm_opt_window.items(), key=lambda x: x[1], reverse=True)
+    opt_window_ordered = sorted(
+        norm_opt_window.items(), key=lambda x: x[1], reverse=True
+    )
     print(optimal_window)
     print("Optimal window normalised: ", norm_opt_window)
     print("Best window ", opt_window_ordered[0], "\n")
@@ -108,7 +150,7 @@ if args.second_file:
 
 if args.combined_file:
     combined_file = args.combined_file
-    results = compare_combined_file(base_file, combined_file, pep_window)
+    results = compare_combined_file(base_file, combined_file, pep_window=0)
 
     res_best = results[0]
 
@@ -117,6 +159,8 @@ if args.combined_file:
 
     regions = res_best["comparison_results"][0]
     region_a, region_b = regions.split(" - ")
+
+    print("Best Norm window: ", res_best["norm_window"])
 
     # print(
     #     "---> Whole Matrix Comparisons = Base: {} Second: {} SSD: {} SDF: {}".format(
@@ -131,11 +175,62 @@ if args.combined_file:
     #     print("Comparison Score = {}, ELM motif = {}".format(result["comparison_results"], result["second"]))
 
     print(
-        "---> Window Calculations = Base: {} Second: {} SSD: {} Comparison: {}".format(
+        "---> Window Calculations = Base: {} Second: {} SSD: {} Comparison: {} Window: {}".format(
             res_best["base"],
             res_best["second"],
             res_best["ssd_global"],
             res_best["comparison_results"],
+            res_best["pep_window"],
+        )
+    )
+    print_df_ranges(
+        res_best["df1"],
+        region_a,
+        res_best["ssd"],
+        res_best["pearsons"],
+        res_best["spearmans"],
+        res_best["kendalls"],
+        res_best["dot_products"],
+        res_best["kl_divergence"],
+    )
+    print_df_ranges(
+        res_best["df2"],
+        region_b,
+        res_best["ssd"],
+        res_best["pearsons"],
+        res_best["spearmans"],
+        res_best["kendalls"],
+        res_best["dot_products"],
+        res_best["kl_divergence"],
+    )
+
+
+if args.two_comb_files:
+    if len(args.two_comb_files) != 2:
+        parser.error("--two_comb_files needs two values")
+
+    print(args.two_comb_files)
+    file1, file2 = args.two_comb_files[0], args.two_comb_files[1]
+
+    results = compare_two_combined(file1, file2, pep_window=0)
+
+    res_best = results[0]
+
+    # results.sort(key=lambda x: x["ssd"])
+    # res_by_ssd = results[0]
+
+    regions = res_best["comparison_results"][0]
+    region_a, region_b = regions.split(" - ")
+
+    print("Best Norm window: ", res_best["norm_window"])
+
+    print(
+        "---> Window Calculations = Base: {} Second: {} SSD: {} Comparison: {} Window: {}".format(
+            res_best["base_name"],
+            res_best["second"],
+            res_best["ssd_global"],
+            res_best["comparison_results"],
+            res_best["pep_window"],
         )
     )
     print_df_ranges(
@@ -161,7 +256,16 @@ if args.combined_file:
 
 if args.single_file:
     single_file = args.single_file
-    results = compare_single_file(single_file, pep_window)
+    results = compare_single_file(single_file, pep_window=0)
 
     for result in results:
-         print("1st PSSM = {}, 2nd PSSM = {}, Comparison Score = {}".format(result["base"], result["second"], result["comparison_results"]))
+        print(
+            "1st PSSM = {}, 2nd PSSM = {}, Comparison Score = {}".format(
+                result["base"], result["second"], result["comparison_results"]
+            )
+        )
+
+
+if args.boxplot:
+    boxplot = args.boxplot
+    plot_important_positions(boxplot)

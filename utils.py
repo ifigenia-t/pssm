@@ -3,18 +3,19 @@ import math
 import operator
 from operator import getitem
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import math
+import seaborn as sns
 from tqdm.auto import tqdm
-
 
 pd.set_option("display.max_rows", 500)
 pd.set_option("display.max_columns", 500)
 pd.set_option("display.width", 1000)
 
 buffer = 1
-# gini_cutoff = 0.4
+gini_cutoff = 0.4
+
 
 class NoResultsError(Exception):
     pass
@@ -54,6 +55,21 @@ def convert_to_df(data, tag):
     df = df.T
     df = df.rename(index={0: tag})
     return df
+
+
+def convert_df_to_string(df):
+    """
+    Takes a dataframe and converts it to a list and then to a sting separated 
+    by ';' 
+    """
+    if len(df.columns) > 1:
+        df = df.T
+        df = df.rename({df.columns[0]: 0}, axis=1)
+    else:
+        df = df.round(decimals=3)
+    df_list = df[0].values.tolist()
+    df_str = ";".join(map(str, df_list))
+    return df_str
 
 
 # Importance Metric
@@ -115,22 +131,27 @@ def gini_window_index(df):
     the positions that have a gini larger than the (mean + SD) of all the ginis.
     """
     gini_df = gini_weight(df)
-    gini_window = gini_df[gini_df > gini_df.mean() + gini_df.std()]
-    gini_window.dropna(inplace=True)
-    # if len(gini_window) == 0:
-    #     df = df ** 2
-    #     gini_df = gini_weight(df)
-    #     gini_window = gini_df[gini_df > gini_df.mean() + gini_df.std()]
+    gini_df_sorted = gini_df.sort_values(by=0, ascending=False)
+    gini_window = []
+    select_indices = [0, 1]
+    gini_window = gini_df_sorted.iloc[select_indices].index.tolist()
+    # print("This is the gini_window: ",gini_window)
+    # gini_window = gini_df[gini_df > gini_cutoff]
+    # gini_window.dropna(inplace=True)
+    # # if len(gini_window) == 0:
+    # #     df = df ** 2
+    # #     gini_df = gini_weight(df)
+    # #     gini_window = gini_df[gini_df > gini_df.mean() + gini_df.std()]
+    # #     gini_window.dropna(inplace=True)
+    # #     if len(gini_window) == 0:
+    # #         gini_window = gini_df[gini_df > gini_df.mean()]
+    # #         gini_window.dropna(inplace=True)
+    # gini_window_index = [ind for ind in gini_window.index]
+    # if len(gini_window_index) == 0:
+    #     gini_window = gini_df[gini_df > gini_df.mean()]
     #     gini_window.dropna(inplace=True)
-    #     if len(gini_window) == 0:
-    #         gini_window = gini_df[gini_df > gini_df.mean()]
-    #         gini_window.dropna(inplace=True)
-    gini_window_index = [ind for ind in gini_window.index]
-    if len(gini_window_index) == 0:
-        gini_window = gini_df[gini_df > gini_df.mean()]
-        gini_window.dropna(inplace=True)
-        gini_window_index = [ind for ind in gini_window.index]
-    return gini_window_index
+    #     gini_window_index = [ind for ind in gini_window.index]
+    return gini_window
 
 
 def calc_gini_windows(df1, df2):
@@ -140,6 +161,7 @@ def calc_gini_windows(df1, df2):
     """
     index_1 = gini_window_index(df1)
     index_2 = gini_window_index(df2)
+    sdt_deviation = sd_matrix(df1)
     print("Index_1: ", index_1)
     print("Index_2: ", index_2)
 
@@ -155,14 +177,15 @@ def calc_gini_windows(df1, df2):
         else:
             if len(df1.columns) <= len(df2.columns):
                 min_window = max(index_1) - min(index_1) + buffer
+                # min_window = max(sdt_deviation) - min(sdt_deviation) + buffer
                 max_window = max(index_2) - min(index_2) + buffer
                 if min_window > max_window:
-                    max_window = min_window
+                    max_window, min_window = min_window, max_window
             else:
                 min_window = max(index_2) - min(index_2) + buffer
                 max_window = max(index_1) - min(index_1) + buffer
                 if min_window > max_window:
-                    max_window = min_window
+                    max_window, min_window = min_window, max_window
             windows_list = [x for x in range(min_window, max_window + 1)]
     elif len(index_1) == 0 or len(index_2) == 0:
         cindex = index_1 + index_2
@@ -189,7 +212,7 @@ def get_df_window(df1, df2, pep_window, i, j):
 
 def find_motif(df):
     """
-    Finds the motif of pssm using the important positions.
+    Finds the motif of the pssm using the important positions.
     """
     motif = ""
     motif_l = []
@@ -395,6 +418,8 @@ def compare_matrix_windowed(df1, df2, pep_window):
     kendalls = {}
     dot_products = {}
     kl_divergence = {}
+    ginis_1 = {}
+    ginis_2 = {}
 
     it_window_a = len(df1.columns) - pep_window
     it_window_b = len(df2.columns) - pep_window
@@ -435,6 +460,8 @@ def compare_matrix_windowed(df1, df2, pep_window):
             kendalls[key] = kendalls_cor
             dot_products[key] = dot_product
             kl_divergence[key] = kl
+            ginis_1[key] = a_gini_df
+            ginis_2[key] = b_gini_df
 
         # TODO make order cofigurable
         results_sorted = sorted(
@@ -455,6 +482,8 @@ def compare_matrix_windowed(df1, df2, pep_window):
         kendalls_res = kendalls[res_0[0]]
         dot_product_res = dot_products[res_0[0]]
         kl_divergence_res = kl_divergence[res_0[0]]
+        ginis_1_res = ginis_1[res_0[0]]
+        ginis_2_res = ginis_2[res_0[0]]
 
     return (
         results_sorted,
@@ -464,6 +493,8 @@ def compare_matrix_windowed(df1, df2, pep_window):
         kendalls_res,
         dot_product_res,
         kl_divergence_res,
+        ginis_1_res,
+        ginis_2_res,
     )
 
 
@@ -491,6 +522,8 @@ def compare_two_files(base_file, second_file, pep_window):
         kendalls,
         dot_products,
         kl_divergence,
+        gini_a,
+        gini_b,
     ) = compare_matrix_windowed(df1_norm, df2_norm, pep_window)
 
     return (
@@ -507,6 +540,8 @@ def compare_two_files(base_file, second_file, pep_window):
         kendalls,
         dot_products,
         kl_divergence,
+        gini_a,
+        gini_b,
     )
 
 
@@ -526,6 +561,7 @@ def compare_combined_file(base_file, combined_file, pep_window):
             index_names.append(data[elm]["motif"])
 
         col_names = [
+            "ELM",
             "Quality",
             "No Important Positions",
             "Windows",
@@ -534,13 +570,14 @@ def compare_combined_file(base_file, combined_file, pep_window):
             "Motif 1",
             "Motif 2",
             "Consensus",
+            "Comparison Windows",
             "Gini 1",
             "Gini 2",
             "Similarity",
         ]
-        df = pd.DataFrame(columns=col_names, index=index_names)
-        # df = pd.DataFrame(columns=col_names)
-        # i = 0
+        # df = pd.DataFrame(columns=col_names, index=index_names)
+        df = pd.DataFrame(columns=col_names)
+        i = 0
 
         for pssm in tqdm(data):
             try:
@@ -557,10 +594,15 @@ def compare_combined_file(base_file, combined_file, pep_window):
                     gini_2 = gini_weight(df2)
                     pep_windows = calc_gini_windows(df1, df2)
                     index_1 = gini_window_index(df1)
+                    # std_dev = sd_matrix(df1)
                     min_window = max(index_1) - min(index_1) + 1
+                    # min_window_dev = max(std_dev) - min(std_dev) +1
+                    # if min_window > min_window_dev:
+                    #     min_window = min_window_dev
                     print("min_window is ", min_window)
                     if min_window > len(df2.columns):
                         min_window = len(df2.columns)
+                        print("Or better the window is ", min_window)
                     index_2 = gini_window_index(df2)
                     if len(index_2) == 1:
                         one_window += 1
@@ -572,7 +614,7 @@ def compare_combined_file(base_file, combined_file, pep_window):
                 print("pep_windows: ", pep_windows)
 
                 for window in pep_windows:
-                    # i += 1
+                    i += 1
                     if window >= min_window:
                         res = {}
                         (
@@ -589,6 +631,8 @@ def compare_combined_file(base_file, combined_file, pep_window):
                             kendalls,
                             dot_products,
                             kl_divergence,
+                            gini_a,
+                            gini_b,
                         ) = compare_two_files(base_file, json_pssm, window)
                         res["equality"] = equality
                         res["base"] = base_file
@@ -605,7 +649,11 @@ def compare_combined_file(base_file, combined_file, pep_window):
                         res["kl_divergence"] = kl_divergence
                         res["pep_window"] = window
                         res["norm_window"] = comparison_results[0][1] / window
-                        
+                        res["gini_1"] = gini_a
+                        res["gini_2"] = gini_b
+                        res["motif_1"] = motif_1
+                        res["motif_2"] = motif_2
+
                         results.append(res)
                         print(
                             "second: ",
@@ -617,35 +665,40 @@ def compare_combined_file(base_file, combined_file, pep_window):
                         )
                         print("Norm_window: ", res["norm_window"])
 
-                        print(
-                            "===>",
-                            df.at[res["second"], "Norm. Window"],
+
+                        # if (
+                        #     res["norm_window"] > df.at[res["second"], "Norm. Window"]
+                        # ) or pd.isna(df.at[res["second"], "Norm. Window"]):
+                        #     print("adding...")
+                        #     df.loc[res["second"]] = [
+                        #         data[pssm]["quality"],
+                        #         len(index_2),
+                        #         window,
+                        #         comparison_results[0][1],
+                        #         res["norm_window"],
+                        #         motif_1,
+                        #         motif_2,
+                        #         data[pssm]["consensus"],
+                        #         gini_1,
+                        #         gini_2,
+                        #         res["pearsons"]
+
+                        #     ]
+                        df.loc[i] = [
+                            res["second"],
+                            data[pssm]["quality"],
+                            len(index_2),
+                            window,
+                            comparison_results[0][1],
                             res["norm_window"],
-                        )
-                        print(
-                            "---",
-                            df.at[res["second"], "Norm. Window"] > res["norm_window"],
-                        )
-
-                        if (
-                            res["norm_window"] > df.at[res["second"], "Norm. Window"]
-                        ) or pd.isna(df.at[res["second"], "Norm. Window"]):
-                            print("adding...")
-                            df.loc[res["second"]] = [
-                                data[pssm]["quality"],
-                                len(index_2),
-                                window,
-                                comparison_results[0][1],
-                                res["norm_window"],
-                                motif_1,
-                                motif_2,
-                                data[pssm]["consensus"],
-                                gini_1,
-                                gini_2,
-                                res["pearsons"]
-
-                            ]
-                        # df.loc[i] = [res["second"], len(index_2), window, comparison_results[0][1], res["norm_window"]]
+                            res["motif_1"],
+                            res["motif_2"],
+                            data[pssm]["consensus"],
+                            comparison_results[0][0],
+                            convert_df_to_string(res["gini_1"]),
+                            convert_df_to_string(res["gini_2"]),
+                            convert_df_to_string(res["pearsons"]),
+                        ]
 
             except TypeError as ex:
                 print("error: {} on pssm: {}".format(ex, pssm))
@@ -654,23 +707,215 @@ def compare_combined_file(base_file, combined_file, pep_window):
             except NoResultsError as ex:
                 print("error: {} on pssm: {}".format(ex, pssm))
                 continue
-            # norm_opt_window = {k: v / k for k, v in optimal_window.items()}
-            # results.sort(key=lambda x: x["comparison_results"][1], reverse=True)
 
         df = df.sort_values(by=["Norm. Window"], ascending=False)
         df.to_csv("comb_ELM.csv")
 
         results.sort(key=lambda x: float(x["norm_window"]), reverse=True)
         print("Results with 1 important position: ", one_window)
-        print("len_results= ", len(results))
-        print("\nNormalised Window Values     Original window")
         for res in results:
             print(
                 "second: ",
                 res["second"],
-                "Norm Window Values",
+                "windows: ",
+                comparison_results[0][0],
+                "Norm Window Values: ",
                 res["norm_window"],
-                "Original window ",
+                "Original window: ",
+                res["pep_window"],
+            )
+        print("\n")
+
+        return results
+
+
+def compare_two_combined(file_1, file_2, pep_window):
+
+    results = []
+    one_window = 0
+    with open(file_1) as json_file_1, open(file_2) as json_file_2:
+
+        data1 = json.load(json_file_1)
+        data2 = json.load(json_file_2)
+
+        # TODO find a way not have to use this
+        index_names = []
+        for pssm in data1:
+            index_names.append(data1[pssm]["motif"])
+
+        col_names = [
+            "ELM",
+            "Quality",
+            "No Important Positions",
+            "Windows",
+            "Comparison Results",
+            "Norm. Window",
+            "Motif 1",
+            "Motif 2",
+            "Consensus",
+            "Comparison Windows",
+            "Gini 1",
+            "Gini 2",
+            "Similarity",
+        ]
+        df = pd.DataFrame(columns=col_names, index=index_names)
+        # df = pd.DataFrame(columns=col_names)
+        # i = 0
+
+        for base_pssm in tqdm(data1):
+            base_file = json.dumps(data1[base_pssm]["pssm"])
+
+            for pssm in tqdm(data2):
+                try:
+                    json_pssm = json.dumps(data2[pssm]["pssm"])
+
+                    print("-----> ", data2[pssm]["motif"])
+
+                    pep_windows = []
+                    if pep_window is 0:
+                        df2 = prepare_matrix(json_pssm)
+                        df1 = prepare_matrix(base_file)
+                        df1 = normalise_matrix(df1)
+                        df2 = normalise_matrix(df2)
+                        gini_1 = gini_weight(df1)
+                        gini_2 = gini_weight(df2)
+                        pep_windows = calc_gini_windows(df1, df2)
+                        index_1 = gini_window_index(df1)
+                        # std_dev = sd_matrix(df1)
+                        min_window = max(index_1) - min(index_1) + 1
+                        # min_window_dev = max(std_dev) - min(std_dev) +1
+                        # if min_window > min_window_dev:
+                        #     min_window = min_window_dev
+                        print("min_window is ", min_window)
+                        if min_window > len(df2.columns):
+                            min_window = len(df2.columns)
+                            print("Or better the window is ", min_window)
+                        index_2 = gini_window_index(df2)
+                        if len(index_2) == 1:
+                            one_window += 1
+                        motif_1 = find_motif(df1)
+                        motif_2 = find_motif(df2)
+                    else:
+                        pep_windows.append(int(pep_window))
+
+                    print("pep_windows: ", pep_windows)
+
+                    for window in pep_windows:
+                        # i += 1
+                        if window >= min_window:
+                            res = {}
+                            (
+                                equality,
+                                _,
+                                _,
+                                ssd_global,
+                                comparison_results,
+                                df1,
+                                df2,
+                                ssd,
+                                pearsons,
+                                spearmans,
+                                kendalls,
+                                dot_products,
+                                kl_divergence,
+                                gini_a,
+                                gini_b,
+                            ) = compare_two_files(base_file, json_pssm, window)
+                            res["equality"] = equality
+                            res["base"] = base_file
+                            res["base_name"] = data1[base_pssm]["motif"]
+                            res["second"] = data2[pssm]["motif"]
+                            res["ssd_global"] = ssd_global
+                            res["comparison_results"] = comparison_results[0]
+                            res["df1"] = df1
+                            res["df2"] = df2
+                            res["ssd"] = ssd
+                            res["pearsons"] = pearsons
+                            res["spearmans"] = spearmans
+                            res["kendalls"] = kendalls
+                            res["dot_products"] = dot_products
+                            res["kl_divergence"] = kl_divergence
+                            res["pep_window"] = window
+                            res["norm_window"] = comparison_results[0][1] / window
+                            res["gini_1"] = gini_a
+                            res["gini_2"] = gini_b
+                            res["motif_1"] = motif_1
+                            res["motif_2"] = motif_2
+
+                            results.append(res)
+                            print(
+                                "second: ",
+                                res["second"],
+                                "window ",
+                                window,
+                                " comparison ",
+                                comparison_results[0][1],
+                            )
+                            print("Norm_window: ", res["norm_window"])
+                            print(".........",res["base_name"])
+                            print("....", pd.isna(df.at[res["base_name"], "Norm. Window"]))
+
+
+                            if (
+                                res["norm_window"] > df.at[res["base_name"], "Norm. Window"]
+                            ) or pd.isna(df.at[res["base_name"], "Norm. Window"]):
+                                print("adding...")
+                                df.loc[res["base_name"]] = [
+                                    res["second"],
+                                    data2[pssm]["quality"],
+                                    len(index_2),
+                                    window,
+                                    comparison_results[0][1],
+                                    res["norm_window"],
+                                    res["motif_1"],
+                                    res["motif_2"],
+                                    data2[pssm]["consensus"],
+                                    comparison_results[0][0],
+                                    convert_df_to_string(res["gini_1"]),
+                                    convert_df_to_string(res["gini_2"]),
+                                    convert_df_to_string(res["pearsons"]),
+                                ]
+                            # df.loc[i] = [
+                            #     base_pssm,
+                            #     res["second"],
+                            #     data2[pssm]["quality"],
+                            #     len(index_2),
+                            #     window,
+                            #     comparison_results[0][1],
+                            #     res["norm_window"],
+                            #     res["motif_1"],
+                            #     res["motif_2"],
+                            #     data2[pssm]["consensus"],
+                            #     comparison_results[0][0],
+                            #     convert_df_to_string(res["gini_1"]),
+                            #     convert_df_to_string(res["gini_2"]),
+                            #     convert_df_to_string(res["pearsons"]),
+                            # ]
+
+                except TypeError as ex:
+                    print("error: {} on pssm: {}".format(ex, pssm))
+                except IndexError as ex:
+                    print("error: {} on pssm: {}, res: {} ".format(ex, pssm, res))
+                except NoResultsError as ex:
+                    print("error: {} on pssm: {}".format(ex, pssm))
+                    continue
+          
+        df = df.sort_values(by=["Norm. Window"], ascending=False)
+        df.to_csv("comb_two_ELM.csv")
+
+        results.sort(key=lambda x: float(x["norm_window"]), reverse=True)
+        print("Results with 1 important position: ", one_window)
+        for res in results:
+            print(
+                "ProPD: ",
+                res["base_name"],
+                "ELM: ",
+                res["second"],
+                "windows: ",
+                comparison_results[0][0],
+                "Norm Window Values: ",
+                res["norm_window"],
+                "Original window: ",
                 res["pep_window"],
             )
         print("\n")
@@ -708,7 +953,6 @@ def compare_single_file(single_file, pep_window):
                     print(df1)
                     print(df2)
                     pep_windows = calc_gini_windows(df1, df2)
-                    print("pep_windows ", pep_windows)
                     index_1 = gini_window_index(df1)
                     # if len(index_1) == 0:
                     min_window = max(index_1) - min(index_1) + 1
@@ -719,7 +963,7 @@ def compare_single_file(single_file, pep_window):
                             min_window = len(df1.columns)
                     if min_window > len(df2.columns):
                         min_window = len(df2.columns)
-                    # index_2 = gini_window_index(df2)
+                    index_2 = gini_window_index(df2)
                 else:
                     pep_windows.append(int(pep_window))
 
@@ -746,6 +990,8 @@ def compare_single_file(single_file, pep_window):
                                 kendalls,
                                 dot_products,
                                 kl_divergence,
+                                gini_a,
+                                gini_b,
                             ) = compare_two_files(base_pssm, second_pssm, window)
                             res["equality"] = equality
                             res["base"] = data[pssm_i]["motif"]
@@ -760,8 +1006,10 @@ def compare_single_file(single_file, pep_window):
                             res["kendalls"] = kendalls
                             res["dot_products"] = dot_products
                             res["kl_divergence"] = kl_divergence
+                            res["pep_window"] = window
+                            res["norm_window"] = comparison_results[0][1] / window
 
-                            row[data[pssm_j]["motif"]] = comparison_results[0][1]
+                            row[data[pssm_j]["motif"]] = res["norm_window"]
                             results.append(res)
 
                         except TypeError as ex:
@@ -784,7 +1032,8 @@ def compare_single_file(single_file, pep_window):
             df.loc[data[pssm_i]["motif"]] = row
             df.to_csv("ELMvsELM.csv")
 
-        results.sort(key=lambda x: x["comparison_results"][1], reverse=True)
+        results.sort(key=lambda x: float(x["norm_window"]), reverse=True)
+        # results.sort(key=lambda x: x["comparison_results"][1], reverse=True)
         return results
 
 
@@ -821,3 +1070,68 @@ def print_df_ranges(
     new_df = new_df.append(kl_divergence)
 
     print(new_df.loc[:, int(a) : int(b)])
+
+
+def plot_important_positions(single_file):
+    """
+    Takes a single file with multiple PSSMs and calculates for each PSSM the number
+    of important and unimportant positions. Then it creates a boxplot graph.
+    """
+    total_positions = 0
+    important_positions = []
+    unimportant_positions =[]
+
+    with open(single_file) as json_file:
+        data = json.load(json_file)
+
+        for pssm in tqdm(data):
+            try:
+                json_pssm = json.dumps(data[pssm]["pssm"])
+                print("-----> ", data[pssm]["motif"])
+                df = prepare_matrix(json_pssm)
+                total_positions += len(df.columns)
+                df_norm = normalise_matrix(df)
+                gini = gini_weight(df_norm)
+                position_list = data[pssm]["expanded_motif"]
+                print("expanded motif ",position_list)
+
+                position_index = [x for x in range(0, len(df.columns))]
+                positions = dict(zip(position_index, position_list))
+
+                for col,position in positions.items():
+                    if position == ".":
+                        unimportant_positions.append(gini.iloc[col,0])
+                    else:
+                        important_positions.append(gini.iloc[col,0])
+            except TypeError as ex:
+                            tqdm.write("error: {} on pssm: {}".format(ex, pssm))
+
+            except IndexError as ex:
+                tqdm.write(
+                    "error: {} on pssm: {}".format(
+                        ex, pssm
+                    )
+                )
+            except NoResultsError as ex:
+                tqdm.write(
+                    "error: {} on pssm: {} ".format(
+                        ex, pssm
+                    )
+                )
+                continue
+        important_df = pd.DataFrame(important_positions)
+        important_df = important_df.rename(columns={0: "Important"})
+        unimportant_df = pd.DataFrame(unimportant_positions)
+        unimportant_df = unimportant_df.rename(columns={0: "Unimportant"})
+
+        print("This is the mean of the important: ", important_df.mean())
+        print("This is the mean of the unimportant: ", unimportant_df.mean())
+        comb_df = pd.concat([important_df, unimportant_df], axis=1) 
+        print(comb_df)
+        mdf = pd.melt(comb_df)
+        print(mdf)
+        mdf = mdf.rename(columns={"variable": "Positions", "value":"Gini"})
+
+        ax = sns.boxplot(x="Positions", y="Gini", data=mdf)
+        plt.show()
+        return ax.figure.savefig("boxplot.png")
