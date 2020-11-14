@@ -7,69 +7,21 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from sklearn.metrics import roc_curve, auc
 from tqdm.auto import tqdm
+
+from data_prep import *
 
 pd.set_option("display.max_rows", 500)
 pd.set_option("display.max_columns", 500)
 pd.set_option("display.width", 1000)
 
 buffer = 1
-gini_cutoff = 0.4
+gini_cutoff = 0.57
 
 
 class NoResultsError(Exception):
     pass
-
-
-# Dataframe preparation
-def prepare_matrix(filename):
-    """
-    Opens a json file and converts it to a dataframe of the correct format
-    """
-    df = pd.read_json(filename)
-    df = df.dropna(axis=1, how="all")
-    df_proc = df.T
-    df_proc = df_proc.dropna()
-    df_proc = df_proc.round(decimals=1)
-    df_proc = df_proc.sort_index(axis=0)
-    return df_proc
-
-
-def normalise_matrix(df):
-    """
-    Performs normalisation calculations on each column of the matrix and returns
-    the normalised matrix
-    Pandas automatically applies colomn-wise functions.
-    """
-    normalized_df = df - df.min()
-    normalized_df = normalized_df / normalized_df.sum()
-    normalized_df = normalized_df.round(decimals=2)
-    return normalized_df
-
-
-def convert_to_df(data, tag):
-    """
-    Coverts data into dataframes with a given tag as an index name.
-    """
-    df = pd.DataFrame(data)
-    df = df.T
-    df = df.rename(index={0: tag})
-    return df
-
-
-def convert_df_to_string(df):
-    """
-    Takes a dataframe and converts it to a list and then to a sting separated 
-    by ';' 
-    """
-    if len(df.columns) > 1:
-        df = df.T
-        df = df.rename({df.columns[0]: 0}, axis=1)
-    else:
-        df = df.round(decimals=3)
-    df_list = df[0].values.tolist()
-    df_str = ";".join(map(str, df_list))
-    return df_str
 
 
 # Importance Metric
@@ -115,7 +67,7 @@ def weight_matrix(df):
 # Calculation of the peptide window
 def calc_brute_force_window(df1, df2):
     """
-    Calculates a list of possible windows for the comparison of two.
+    Calculates a list of possible windows for the comparison of two PSSMs.
     """
     max_diff = 0
     if len(df1.columns) > len(df2.columns):
@@ -124,6 +76,8 @@ def calc_brute_force_window(df1, df2):
         max_diff = len(df1.columns)
     return [x for x in range(1, max_diff + 1)]
 
+def calc_asdf_window(df1, df2):
+    pass
 
 def gini_window_index(df):
     """
@@ -131,13 +85,30 @@ def gini_window_index(df):
     the positions that have a gini larger than the (mean + SD) of all the ginis.
     """
     gini_df = gini_weight(df)
-    gini_df_sorted = gini_df.sort_values(by=0, ascending=False)
-    gini_window = []
-    select_indices = [0, 1]
-    gini_window = gini_df_sorted.iloc[select_indices].index.tolist()
+    # gini_df_sorted = gini_df.sort_values(by=0, ascending=False)
+    # gini_window = []
+    # select_indices = [0, 1]
+    # gini_window = gini_df_sorted.iloc[select_indices].index.tolist()
+    
+    # gini_window_index = [ind for ind in gini_window.index]
+    # print("This is the gini window index ", gini_window_index)
+    gini_window = gini_df[gini_df > gini_cutoff]
+    gini_window.dropna(inplace=True)
     # print("This is the gini_window: ",gini_window)
-    # gini_window = gini_df[gini_df > gini_cutoff]
-    # gini_window.dropna(inplace=True)
+    if len(gini_window) == 0:
+        gini_df_sorted = gini_df.sort_values(by=0, ascending=False)
+        gini_window = []
+        select_indices = [0, 1]
+        gini_window_index = gini_df_sorted.iloc[select_indices].index.tolist()
+        # print("This is the new gini index: ", gini_window_index, " calc with 2 max")
+    else:
+        gini_window_index = [ind for ind in gini_window.index]
+        # print("This is the gini index: ", gini_window_index, " calc with gini cutoff")
+    
+        # gini_window_index.sort()
+    
+    # gini_window_index = [ind for ind in gini_window.index]
+    # print("This is the gini window index ", gini_window_index)
     # # if len(gini_window) == 0:
     # #     df = df ** 2
     # #     gini_df = gini_weight(df)
@@ -151,7 +122,7 @@ def gini_window_index(df):
     #     gini_window = gini_df[gini_df > gini_df.mean()]
     #     gini_window.dropna(inplace=True)
     #     gini_window_index = [ind for ind in gini_window.index]
-    return gini_window
+    return gini_window_index
 
 
 def calc_gini_windows(df1, df2):
@@ -161,39 +132,45 @@ def calc_gini_windows(df1, df2):
     """
     index_1 = gini_window_index(df1)
     index_2 = gini_window_index(df2)
-    sdt_deviation = sd_matrix(df1)
+    # sdt_deviation = sd_matrix(df1)
     print("Index_1: ", index_1)
     print("Index_2: ", index_2)
 
     windows_list = []
-
-    if len(index_1) != 0 and len(index_2) != 0:
-        if len(index_1) == 1:
-            window = max(index_2) - min(index_2) + buffer
-            windows_list.append(window)
-        elif len(index_2) == 1:
-            window = max(index_1) - min(index_1) + buffer
-            windows_list.append(window)
-        else:
-            if len(df1.columns) <= len(df2.columns):
-                min_window = max(index_1) - min(index_1) + buffer
-                # min_window = max(sdt_deviation) - min(sdt_deviation) + buffer
-                max_window = max(index_2) - min(index_2) + buffer
-                if min_window > max_window:
-                    max_window, min_window = min_window, max_window
-            else:
-                min_window = max(index_2) - min(index_2) + buffer
-                max_window = max(index_1) - min(index_1) + buffer
-                if min_window > max_window:
-                    max_window, min_window = min_window, max_window
-            windows_list = [x for x in range(min_window, max_window + 1)]
-    elif len(index_1) == 0 or len(index_2) == 0:
-        cindex = index_1 + index_2
-        max_window = min_window = max(cindex) - min(cindex) + buffer
-        windows_list = [x for x in range(min_window, max_window + 1)]
-    else:
-        windows_list = calc_brute_force_window(df1, df2)
-
+    # if len(df1.columns) <= len(df2.columns):
+    #     window = len(df1.columns) 
+    # else:
+    #     window = len(df2.columns)
+    # windows_list.append(window)
+    windows_list = calc_brute_force_window(df1, df2)
+    # if len(index_1) != 0 and len(index_2) != 0:
+    #     if len(index_1) == 1:
+    #         window = max(index_2) - min(index_2) + buffer
+    #         windows_list.append(window)
+    #     elif len(index_2) == 1:
+    #         window = max(index_1) - min(index_1) + buffer
+    #         windows_list.append(window)
+    #     else:
+    #         if len(df1.columns) <= len(df2.columns):
+    #             min_window = max(index_1) - min(index_1) + buffer
+    #             # min_window = max(sdt_deviation) - min(sdt_deviation) + buffer
+    #             max_window = max(index_2) - min(index_2) + buffer
+    #             if min_window > max_window:
+    #                 max_window, min_window = min_window, max_window
+    #         else:
+    #             min_window = max(index_2) - min(index_2) + buffer
+    #             max_window = max(index_1) - min(index_1) + buffer
+    #             if min_window > max_window:
+    #                 max_window, min_window = min_window, max_window
+    #         windows_list = [x for x in range(min_window, max_window + 1)]
+    # elif len(index_1) == 0 or len(index_2) == 0:
+    #     cindex = index_1 + index_2
+    #     max_window = min_window = max(cindex) - min(cindex) + buffer
+    #     windows_list = [x for x in range(min_window, max_window + 1)]
+    # else:
+    #     windows_list = calc_brute_force_window(df1, df2)
+   
+    print("This is the windows_list: ", windows_list)
     return windows_list
 
 
@@ -232,6 +209,7 @@ def find_motif(df):
                 motif_l.append(Index_label[0])
         else:
             motif_l.append("x")
+    print("This is the motif: ", motif.join(motif_l))
     return motif.join(motif_l)
 
 
@@ -325,10 +303,10 @@ def calc_pearson_correlation(dfi, dfj):
     pearson = pearson.round(decimals=3)
 
     # Turning the correlation coefficient scale from -1 - 1 to 0-1
-    pearson_scale = (pearson + 1) / 2
-    pearson_scale = pearson_scale.round(decimals=3)
+    # pearson_scale = (pearson + 1) / 2
+    # pearson_scale = pearson_scale.round(decimals=3)
 
-    return pearson_scale
+    return pearson
 
 
 def calc_spearmans_correlation(dfi, dfj):
@@ -559,9 +537,8 @@ def compare_combined_file(base_file, combined_file, pep_window):
         index_names = []
         for elm in data:
             index_names.append(data[elm]["motif"])
-
+        # "ELM",
         col_names = [
-            "ELM",
             "Quality",
             "No Important Positions",
             "Windows",
@@ -575,20 +552,21 @@ def compare_combined_file(base_file, combined_file, pep_window):
             "Gini 2",
             "Similarity",
         ]
-        # df = pd.DataFrame(columns=col_names, index=index_names)
-        df = pd.DataFrame(columns=col_names)
-        i = 0
+        df = pd.DataFrame(columns=col_names, index=index_names)
+        # df = pd.DataFrame(columns=col_names)
+        # i = 0
 
         for pssm in tqdm(data):
             try:
-                json_pssm = json.dumps(data[pssm]["pssm"])
+                # json_pssm = json.dumps(data[pssm]["pssm"])
+                json_pssm = json.dumps(data[pssm]["other_scoring_methods"]["log odds"])
                 print("-----> ", data[pssm]["motif"])
 
                 pep_windows = []
                 if pep_window is 0:
-                    df2 = prepare_matrix(json_pssm)
                     df1 = prepare_matrix(base_file)
                     df1 = normalise_matrix(df1)
+                    df2 = prepare_matrix(json_pssm)
                     df2 = normalise_matrix(df2)
                     gini_1 = gini_weight(df1)
                     gini_2 = gini_weight(df2)
@@ -614,7 +592,7 @@ def compare_combined_file(base_file, combined_file, pep_window):
                 print("pep_windows: ", pep_windows)
 
                 for window in pep_windows:
-                    i += 1
+                    # i += 1
                     if window >= min_window:
                         res = {}
                         (
@@ -666,39 +644,40 @@ def compare_combined_file(base_file, combined_file, pep_window):
                         print("Norm_window: ", res["norm_window"])
 
 
-                        # if (
-                        #     res["norm_window"] > df.at[res["second"], "Norm. Window"]
-                        # ) or pd.isna(df.at[res["second"], "Norm. Window"]):
-                        #     print("adding...")
-                        #     df.loc[res["second"]] = [
-                        #         data[pssm]["quality"],
-                        #         len(index_2),
-                        #         window,
-                        #         comparison_results[0][1],
-                        #         res["norm_window"],
-                        #         motif_1,
-                        #         motif_2,
-                        #         data[pssm]["consensus"],
-                        #         gini_1,
-                        #         gini_2,
-                        #         res["pearsons"]
+                        if (
+                            res["norm_window"] > df.at[res["second"], "Norm. Window"]
+                        ) or pd.isna(df.at[res["second"], "Norm. Window"]):
+                            print("adding...")
+                            df.loc[res["second"]] = [
+                                data[pssm]["quality"],
+                                len(index_2),
+                                window,
+                                comparison_results[0][1],
+                                res["norm_window"],
+                                res["motif_1"],
+                                res["motif_2"],
+                                data[pssm]["consensus"],
+                                comparison_results[0][0],
+                                convert_df_to_string(res["gini_1"]),
+                                convert_df_to_string(res["gini_2"]),
+                                convert_df_to_string(res["pearsons"])
+                            ]
 
-                        #     ]
-                        df.loc[i] = [
-                            res["second"],
-                            data[pssm]["quality"],
-                            len(index_2),
-                            window,
-                            comparison_results[0][1],
-                            res["norm_window"],
-                            res["motif_1"],
-                            res["motif_2"],
-                            data[pssm]["consensus"],
-                            comparison_results[0][0],
-                            convert_df_to_string(res["gini_1"]),
-                            convert_df_to_string(res["gini_2"]),
-                            convert_df_to_string(res["pearsons"]),
-                        ]
+                        # df.loc[i] = [
+                        #     res["second"],
+                        #     data[pssm]["quality"],
+                        #     len(index_2),
+                        #     window,
+                        #     comparison_results[0][1],
+                        #     res["norm_window"],
+                        #     res["motif_1"],
+                        #     res["motif_2"],
+                        #     data[pssm]["consensus"],
+                        #     comparison_results[0][0],
+                        #     convert_df_to_string(res["gini_1"]),
+                        #     convert_df_to_string(res["gini_2"]),
+                        #     convert_df_to_string(res["pearsons"]),
+                        # ]
 
             except TypeError as ex:
                 print("error: {} on pssm: {}".format(ex, pssm))
@@ -709,7 +688,7 @@ def compare_combined_file(base_file, combined_file, pep_window):
                 continue
 
         df = df.sort_values(by=["Norm. Window"], ascending=False)
-        df.to_csv("comb_ELM.csv")
+        df.to_csv("TANK_vs_ELM_min_len_-.csv")
 
         results.sort(key=lambda x: float(x["norm_window"]), reverse=True)
         print("Results with 1 important position: ", one_window)
@@ -764,22 +743,24 @@ def compare_two_combined(file_1, file_2, pep_window):
 
         for base_pssm in tqdm(data1):
             base_file = json.dumps(data1[base_pssm]["pssm"])
-
+            print("-----> ", data1[base_pssm]["motif"])
             for pssm in tqdm(data2):
                 try:
-                    json_pssm = json.dumps(data2[pssm]["pssm"])
-
+                    # json_pssm = json.dumps(data2[pssm]["pssm"])
+                    json_pssm = json.dumps(data2[pssm]["other_scoring_methods"]["log odds"])
+                    
                     print("-----> ", data2[pssm]["motif"])
 
                     pep_windows = []
                     if pep_window is 0:
-                        df2 = prepare_matrix(json_pssm)
                         df1 = prepare_matrix(base_file)
                         df1 = normalise_matrix(df1)
+                        df2 = prepare_matrix(json_pssm)
                         df2 = normalise_matrix(df2)
                         gini_1 = gini_weight(df1)
                         gini_2 = gini_weight(df2)
                         pep_windows = calc_gini_windows(df1, df2)
+                        print("Windows ", pep_windows)
                         index_1 = gini_window_index(df1)
                         # std_dev = sd_matrix(df1)
                         min_window = max(index_1) - min(index_1) + 1
@@ -901,7 +882,7 @@ def compare_two_combined(file_1, file_2, pep_window):
                     continue
           
         df = df.sort_values(by=["Norm. Window"], ascending=False)
-        df.to_csv("comb_two_ELM.csv")
+        df.to_csv("ProPD_vs_ELM_logodds_-1-1.csv")
 
         results.sort(key=lambda x: float(x["norm_window"]), reverse=True)
         print("Results with 1 important position: ", one_window)
@@ -1071,6 +1052,24 @@ def print_df_ranges(
 
     print(new_df.loc[:, int(a) : int(b)])
 
+def Find_Optimal_Cutoff(target, predicted, label):
+    """ 
+    Find the optimal probability cutoff point for a classification model related to event rate
+    Parameters
+    ----------
+    target : Matrix with dependent or target data, where rows are observations
+
+    predicted : Matrix with predicted data, where rows are observations
+
+    Returns: list type, with optimal cutoff value
+        
+    """
+    fpr, tpr, threshold = roc_curve(target, predicted, pos_label=label)
+    i = np.arange(len(tpr)) 
+    roc = pd.DataFrame({'tf' : pd.Series(tpr-(1-fpr), index=i), 'threshold' : pd.Series(threshold, index=i)})
+    roc_t = roc.iloc[(roc.tf-0).abs().argsort()[:1]]
+
+    return list(roc_t['threshold']) 
 
 def plot_important_positions(single_file):
     """
@@ -1086,7 +1085,7 @@ def plot_important_positions(single_file):
 
         for pssm in tqdm(data):
             try:
-                json_pssm = json.dumps(data[pssm]["pssm"])
+                json_pssm = json.dumps(data[pssm]["other_scoring_methods"]["log odds"])
                 print("-----> ", data[pssm]["motif"])
                 df = prepare_matrix(json_pssm)
                 total_positions += len(df.columns)
@@ -1124,7 +1123,9 @@ def plot_important_positions(single_file):
         unimportant_df = pd.DataFrame(unimportant_positions)
         unimportant_df = unimportant_df.rename(columns={0: "Unimportant"})
 
-        print("This is the mean of the important: ", important_df.mean())
+        print("This is the min of the important: ", important_df.min())
+        print("This is the max of the important: ", important_df.max())
+        print("This is the length of the important: ", important_df.shape[0])
         print("This is the mean of the unimportant: ", unimportant_df.mean())
         comb_df = pd.concat([important_df, unimportant_df], axis=1) 
         print(comb_df)
@@ -1134,4 +1135,38 @@ def plot_important_positions(single_file):
 
         ax = sns.boxplot(x="Positions", y="Gini", data=mdf)
         plt.show()
-        return ax.figure.savefig("boxplot.png")
+
+        # Calculate the optimal Cutoff and the area under the ROC curve
+        mdf = mdf.dropna(axis=0)
+        # mdf["Gini"] = 1-mdf["Gini"]
+        print(mdf)
+        fpr, tpr, thresholds = roc_curve(mdf["Positions"], mdf["Gini"], pos_label="Important", drop_intermediate = False)
+
+        print("fpr ",fpr)
+        print(len(fpr))
+        print("tpr", tpr)
+        print(len(tpr))
+        print("thresholds ", thresholds)
+        print(len(thresholds))
+        roc_auc = auc(fpr, tpr)
+        print("Area under the ROC curve : ",roc_auc)
+
+     
+
+        threshold = Find_Optimal_Cutoff(mdf["Positions"], mdf["Gini"], "Important")
+        print("This is the optimal cutoff: ",threshold)
+        
+        # # Plot of a ROC curve
+        plt.figure()
+        plt.plot(fpr, tpr, color='darkorange', label='ROC curve (area = %f)' % roc_auc)
+        plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver Operating Characteristic Curve')
+        plt.legend(loc="lower right")
+        plt.show()
+        return ax.figure.savefig("boxplot_logodds.png")
+
+
+
+
