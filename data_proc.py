@@ -81,10 +81,17 @@ def calc_motif(df):
     motif = ""
     motif_list =[]
     cutoff = 0.57
+    gini_df = gini_weight(df)
+    gini_mean = gini_df.mean()
+    mean_cutoff = gini_mean.mean()
 
     for col in df.columns:
         gini_df = gini_weight(df[col].to_frame())
         if gini_df.values[0][0] >= cutoff:
+            ind = df[df[col] == df[col].max()].index.tolist()
+            motif_list.append(ind[0])
+        # elif df[col].max() >= mean_cutoff:
+        elif gini_df.values[0][0] >= mean_cutoff:
             ind = df[df[col] == df[col].max()].index.tolist()
             motif_list.append(ind[0])
         else:
