@@ -51,9 +51,9 @@ def compare_single_to_combined_file(file1, file2):
             iters = get_dfs_backwards_sliding(df1_norm, df2_norm)
 
             res = process_data(iters)
-            
+
             res.base_name = filename
-            res.elm =  data2[pssm]["motif"]
+            res.elm = data2[pssm]["motif"]
             res.quality = data2[pssm]["quality"]
             res.consensus = data2[pssm]["consensus"]
 
@@ -103,7 +103,7 @@ def compare_two_combined_new(file1, file2, correct_results_file=""):
                     res = process_data(iters)
 
                     res.base_name = data1[base_pssm]["motif"]
-                    res.elm =  data2[pssm]["motif"]
+                    res.elm = data2[pssm]["motif"]
                     res.quality = data2[pssm]["quality"]
                     res.consensus = data2[pssm]["consensus"]
 
@@ -115,8 +115,12 @@ def compare_two_combined_new(file1, file2, correct_results_file=""):
                     print(e)
 
     multi_comp.create_file()
+    u_statistic, p_value = multi_comp.mann_whitney_u_test()
+    print("\nThis is the u statistic ", u_statistic)
+    print("\nThis is the p-value ", p_value)
     if len(multi_comp.match) != 0 or len(multi_comp.mismatch) != 0:
         multi_comp.plot_match()
+        multi_comp.plot_ROC()
 
 
 def compare_two_files_new(base_file, second_file, pep_window, backwards_reading=False):

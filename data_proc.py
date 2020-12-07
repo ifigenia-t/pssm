@@ -80,7 +80,7 @@ def process_data(iters):
 def calc_motif(df):
     motif = ""
     motif_list =[]
-    cutoff = 0.57
+    cutoff = 0.58
     gini_df = gini_weight(df)
     gini_mean = gini_df.mean()
     mean_cutoff = gini_mean.mean()

@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from scipy import stats
+from sklearn.metrics import roc_auc_score, auc, roc_curve
 
 
 def convert_df_to_string(df):
@@ -92,6 +94,35 @@ class MultiComparison:
 
         plt.show()
 
+    def plot_ROC(self):
+        match_df = pd.DataFrame(self.match, columns=["Match"])
+        match_df = match_df.rename(columns={0: "Match"})
+        mismatch_df = pd.DataFrame(self.mismatch, columns=["Mismatch"])
+        mismatch_df = mismatch_df.rename(columns={0: "Mismatch"})
+
+        comb_df = pd.concat([match_df, mismatch_df], axis=1)
+        
+        mdf = pd.melt(comb_df)
+        mdf = mdf.rename(columns={"variable": "Identification", "value": "Comparison"})
+        mdf = mdf.dropna(axis=0)
+        # mdf["Comparison"] = 1-mdf["Comparison"]
+        fpr, tpr, thresholds = roc_curve(mdf["Identification"], mdf["Comparison"], pos_label="Match")
+
+        plt.figure()
+        plt.plot(fpr, tpr, color='darkorange', label='ROC curve (area = %0.2f)' % auc(fpr, tpr))
+        plt.plot( color='navy', linestyle='--')
+        plt.title("ROC curve")
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.legend(loc="lower right")
+        plt.show()
+
+
+        # ROC Curve
+        # print("This is the AUC ",roc_auc_score(comb_df["Match"], comb_df["Mismatch"]))
+        
+
+
     def add(self, result):
         if (
             result.comparison_results[0][1]
@@ -115,9 +146,10 @@ class MultiComparison:
             print("comparing")
             if result.elm in self.correct_results[result.base_name]:
                 print(result.base_name, result.elm, "match")
-                self.match.append(result.comparison_results[1])
+                self.match.append(result.comparison_results[0][1])
+                print("match", result.comparison_results[1])
             else:
-                self.mismatch.append(result.comparison_results[1])
+                self.mismatch.append(result.comparison_results[0][1])
                 print(result.base_name, result.elm, "miss")
 
         if hasattr(self, "all_df"):
@@ -126,3 +158,19 @@ class MultiComparison:
                 result.elm, result.base_name
             ] = result.comparison_results[1]
 
+    def mann_whitney_u_test(self):
+        """
+        Perform the Mann-Whitney U Test, comparing two different distributions.
+        Args:
+        distribution_1: List. 
+        distribution_2: List.
+        Outputs:
+            u_statistic: Float. U statisitic for the test.
+            p_value: Float.
+        """
+
+        print("\n====> match, miss\n", self.match)
+        print("\nmismatch \n", self.mismatch)
+       
+        u_statistic, p_value = stats.mannwhitneyu(self.match, self.mismatch)
+        return u_statistic, p_value
