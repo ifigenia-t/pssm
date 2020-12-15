@@ -1,11 +1,9 @@
 import argparse
 import operator
 
-from commands import compare_two_combined_new, compare_two_files_new, compare_single_to_combined_file
-from utils import (calc_gini_windows, compare_combined_file,
-                   compare_single_file, compare_two_combined,
-                   compare_two_files, normalise_matrix,
-                   plot_important_positions, prepare_matrix, print_df_ranges)
+from commands import (compare_combined_file, compare_single_to_combined_file,
+                      compare_two_combined_new, compare_two_files_new)
+from utils import (plot_important_positions)
 
 # pep_window = 4
 buffer = 1
@@ -44,6 +42,9 @@ parser.add_argument(
 parser.add_argument(
     "--correct_results_file", "-crf", help="Correct results file to compaire against"
 )
+parser.add_argument(
+    "--multi_metrics", "-mm", default = False, help="Return multiple similarity metrics from comparison"
+)
 args = parser.parse_args()
 
 if args.peptide_window:
@@ -78,19 +79,22 @@ if args.two_comb_files:
         correct_results_file = args.correct_results_file
 
     print(args.two_comb_files)
+    multi_metrics = args.multi_metrics
     file1, file2 = args.two_comb_files[0], args.two_comb_files[1]
-    compare_two_combined_new(file1, file2, correct_results_file)
+    compare_two_combined_new(file1, file2, correct_results_file, multi_metrics=multi_metrics)
 
 if args.single_file:
     single_file = args.single_file
-    results = compare_single_file(single_file, pep_window=0)
+    multi_metrics = args.multi_metrics
+    results = compare_combined_file(single_file, multi_metrics=multi_metrics)
 
-    for result in results:
-        print(
-            "1st PSSM = {}, 2nd PSSM = {}, Comparison Score = {}".format(
-                result["base"], result["second"], result["comparison_results"]
-            )
-        )
+
+    # for result in results:
+    #     print(
+    #         "1st PSSM = {}, 2nd PSSM = {}, Comparison Score = {}".format(
+    #             result["base"], result["second"], result["comparison_results"]
+    #         )
+    #     )
 
 
 if args.boxplot:

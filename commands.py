@@ -14,8 +14,57 @@ from data_proc import process_data
 from result import Result
 
 
-def compare_combined_file(file1):
-    pass
+def compare_combined_file(file1, multi_metrics = False):
+    with open(file1) as json_file_1:
+        data1 = json.load(json_file_1)
+
+        multi_comp = MultiComparison(
+            data1, data1
+        )
+
+        for base_pssm in tqdm(data1):
+            base_file = json.dumps(data1[base_pssm]["pssm"])
+
+            for pssm in tqdm(data1):
+                try:
+                    json_pssm = json.dumps(
+                        data1[pssm]["other_scoring_methods"]["log odds"]
+                    )
+
+                    df1 = prepare_matrix(base_file)
+                    df1_norm = normalise_matrix(df1)
+
+                    df2 = prepare_matrix(json_pssm)
+                    df2_norm = normalise_matrix(df2)
+
+                    iters = get_dfs_backwards_sliding(df1_norm, df2_norm)
+
+                    res = process_data(iters, multi_metrics = multi_metrics)
+
+                    res.base_name = data1[base_pssm]["motif"]
+                    res.elm = data1[pssm]["motif"]
+                    res.quality = data1[pssm]["quality"]
+                    res.consensus = data1[pssm]["consensus"]
+
+                    multi_comp.add(res)
+
+                    if multi_metrics:
+                        multi_comp.add_multi_metrics(res)
+
+                    output_data(res.comparison_results)
+
+                except Exception as e:
+                    print(e)
+    if multi_metrics:
+        multi_comp.plot_multi_best_match()
+        multi_comp.plot_multi_roc()
+    multi_comp.create_file()
+    # u_statistic, p_value = multi_comp.mann_whitney_u_test()
+    # print("\nThis is the u statistic ", u_statistic)
+    # print("\nThis is the p-value ", p_value)
+    # if len(multi_comp.match) != 0 or len(multi_comp.mismatch) != 0:
+    #     multi_comp.plot_match()
+    #     multi_comp.plot_ROC()
 
 
 def compare_single_to_combined_file(file1, file2):
@@ -67,7 +116,7 @@ def compare_single_to_combined_file(file1, file2):
     comp.create_file()
 
 
-def compare_two_combined_new(file1, file2, correct_results_file=""):
+def compare_two_combined_new(file1, file2, correct_results_file="", multi_metrics = False):
     """
     Opens two json files containing multiple PSSMs and compares them all to eachother.
     Output is a csv table containing the best results of the comparison.
@@ -100,7 +149,7 @@ def compare_two_combined_new(file1, file2, correct_results_file=""):
 
                     iters = get_dfs_backwards_sliding(df1_norm, df2_norm)
 
-                    res = process_data(iters)
+                    res = process_data(iters, multi_metrics = multi_metrics)
 
                     res.base_name = data1[base_pssm]["motif"]
                     res.elm = data2[pssm]["motif"]
@@ -108,19 +157,25 @@ def compare_two_combined_new(file1, file2, correct_results_file=""):
                     res.consensus = data2[pssm]["consensus"]
 
                     multi_comp.add(res)
+                    if multi_metrics:
+                        multi_comp.add_multi_metrics_file(res)
 
                     output_data(res.comparison_results)
 
                 except Exception as e:
                     print(e)
 
+    if multi_metrics:
+        multi_comp.plot_multi_best_match_file()
+        multi_comp.plot_multi_roc()
+
     multi_comp.create_file()
-    u_statistic, p_value = multi_comp.mann_whitney_u_test()
-    print("\nThis is the u statistic ", u_statistic)
-    print("\nThis is the p-value ", p_value)
-    if len(multi_comp.match) != 0 or len(multi_comp.mismatch) != 0:
-        multi_comp.plot_match()
-        multi_comp.plot_ROC()
+    # u_statistic, p_value = multi_comp.mann_whitney_u_test()
+    # print("\nThis is the u statistic ", u_statistic)
+    # print("\nThis is the p-value ", p_value)
+    # if len(multi_comp.match) != 0 or len(multi_comp.mismatch) != 0:
+    #     multi_comp.plot_match()
+    #     multi_comp.plot_ROC()
 
 
 def compare_two_files_new(base_file, second_file, pep_window, backwards_reading=False):
