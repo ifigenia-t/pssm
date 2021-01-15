@@ -43,8 +43,10 @@ def process_data(iters, multi_metrics=False):
         b_gini_df = gini_weight(b_df)
         b_gini_df = b_gini_df.T
 
+        # print("calculating simliarity")
         (kendalls, pearsons_cor, spearmans, dots, ssds, kls) = calculate_similarity(a_df, b_df)
 
+        # print("done")
         comparison = pd.DataFrame(
             pearsons_cor.values * a_gini_df.values * b_gini_df.values,
             columns=pearsons_cor.columns,

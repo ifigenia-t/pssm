@@ -15,13 +15,16 @@ from result import Result
 
 
 def compare_combined_file(file1, multi_metrics = False):
+    """
+    Opens one json file containing multiple PSSMs and compares them all to eachother.
+    """
     with open(file1) as json_file_1:
         data1 = json.load(json_file_1)
 
         multi_comp = MultiComparison(
             data1, data1
         )
-
+        
         for base_pssm in tqdm(data1):
             base_file = json.dumps(data1[base_pssm]["pssm"])
 
@@ -58,7 +61,9 @@ def compare_combined_file(file1, multi_metrics = False):
     if multi_metrics:
         multi_comp.plot_multi_best_match()
         multi_comp.plot_multi_roc()
+        multi_comp.plot_rank_boxplots()
     multi_comp.create_file()
+
     # u_statistic, p_value = multi_comp.mann_whitney_u_test()
     # print("\nThis is the u statistic ", u_statistic)
     # print("\nThis is the p-value ", p_value)
@@ -111,6 +116,7 @@ def compare_single_to_combined_file(file1, file2):
             output_data(res.comparison_results)
 
         except Exception as e:
+            print("this is what failed")
             print(e)
 
     comp.create_file()
@@ -128,7 +134,7 @@ def compare_two_combined_new(file1, file2, correct_results_file="", multi_metric
         multi_comp = MultiComparison(
             data1, data2, correct_results_file=correct_results_file
         )
-
+        print("correct_result_file ", correct_results_file)
         for base_pssm in tqdm(data1):
             base_file = json.dumps(data1[base_pssm]["pssm"])
             print("-----> ", data1[base_pssm]["motif"])
@@ -163,12 +169,13 @@ def compare_two_combined_new(file1, file2, correct_results_file="", multi_metric
                     output_data(res.comparison_results)
 
                 except Exception as e:
+                    print("this is what failed 2")
                     print(e)
 
     if multi_metrics:
         multi_comp.plot_multi_best_match_file()
         multi_comp.plot_multi_roc()
-
+        multi_comp.plot_rank_boxplots()
     multi_comp.create_file()
     # u_statistic, p_value = multi_comp.mann_whitney_u_test()
     # print("\nThis is the u statistic ", u_statistic)

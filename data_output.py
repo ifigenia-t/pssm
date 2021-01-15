@@ -1,4 +1,5 @@
 import json
+from utils import sum_squared_distance_matrix
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,6 +9,7 @@ from scipy.stats.mstats_basic import pearsonr
 import seaborn as sns
 from scipy import stats
 from sklearn.metrics import roc_auc_score, auc, roc_curve
+import operator
 
 
 def convert_df_to_string(df):
@@ -27,9 +29,26 @@ def convert_df_to_string(df):
 
 def output_data(results):
     res_best = results[0]
-
     print(res_best)
 
+def find_rank_file(elms, correct_res, metric, reverse=True):
+    ranks = []
+    elms[metric].sort(key=operator.itemgetter('result'), reverse=reverse)
+    for cr in correct_res:
+        for i, e in  enumerate(elms[metric]):
+            if e['elm'] == cr:
+                ranks.append(i)
+ 
+    return ranks
+
+def find_rank_name(elms, pssm, metric, reverse=True):
+    ranks = []
+    elms[metric].sort(key=operator.itemgetter('result'), reverse=reverse)
+    for i, e in  enumerate(elms[metric]):
+        if e['elm'] == pssm:
+            ranks.append(i)
+
+    return ranks
 
 class MultiComparison:
     def __init__(
@@ -48,7 +67,18 @@ class MultiComparison:
             "ssds": {"match": [], "mismatch": []},
             "kls": {"match": [], "mismatch": []},
         }
+
         self.best_match = {}
+        self.all_ranks = {}
+        
+
+        self.pearson_rank = []
+        self.kendall_rank = []
+        self.spearman_rank = []
+        self.ssd_rank = []
+        self.dot_rank = []
+        self.kl_rank = []
+        
         if use_index:
             data_1_names = []
             for pssm in data_file_1:
@@ -68,19 +98,25 @@ class MultiComparison:
             "Gini 2",
             "Similarity",
         ]
+        similarity_met_col_names = ["Pearsons", "Kendalls", "Spearmans", "SSD", "Dot Product", "KL"]
+        
 
         self.best_df = pd.DataFrame(columns=col_names, index=data_1_names)
-        if data_file_2 is not "":
+        self.similarity_df = pd.DataFrame(columns=similarity_met_col_names, index=data_1_names)
+
+        if data_file_2 != "":
             data_2_names = []
             for pssm in data_file_2:
                 data_2_names.append(data_file_2[pssm]["motif"])
             self.all_df = pd.DataFrame(columns=data_1_names, index=data_2_names)
 
-        if correct_results_file is not "":
+        if correct_results_file != "":
             with open(correct_results_file) as crf:
                 self.correct_results = json.load(crf)
                 self.match = []
                 self.mismatch = []
+
+        
 
     def create_file(self):
         self.best_df = self.best_df.sort_values(
@@ -90,6 +126,9 @@ class MultiComparison:
         self.best_df.to_csv("elm-best.csv")
         if hasattr(self, "all_df"):
             self.all_df.to_csv("elm-all.csv")
+        if hasattr(self, "similarity_df"):
+            print(self.similarity_df)
+            self.similarity_df.to_csv("proppd_similarity.csv")
 
     def plot_match(self):
         match_df = pd.DataFrame(self.match, columns=["Match"])
@@ -136,6 +175,7 @@ class MultiComparison:
         # print("This is the AUC ",roc_auc_score(comb_df["Match"], comb_df["Mismatch"]))
 
     def add(self, result):
+        print("add")
         if (
             result.comparison_results[0][1]
             > self.best_df.at[result.base_name, "Comparison Results"]
@@ -166,9 +206,16 @@ class MultiComparison:
 
         if hasattr(self, "all_df"):
             print("adding 2...", result.elm)
-            self.all_df.at[result.elm, result.base_name] = result.comparison_results[1]
+            self.all_df.at[result.elm, result.base_name] = result.comparison_results[0][1]
+
+        pearson_comp = []
 
     def add_multi_metrics_file(self, result):
+        """
+        Checks the correct results based on a correct results map. 
+        Then it appends the result in the respective match/mismatch lists
+        for every simmilarity metric.
+        """
         if result.elm in self.correct_results[result.base_name]:
             self.multi_metrics["pearsons"]["match"].append(
                 result.comparison_results[0][1]
@@ -217,6 +264,15 @@ class MultiComparison:
                 "ssds": {},
                 "kls": {},
             }
+        if result.base_name not in self.all_ranks:
+            self.all_ranks[result.base_name] = {
+                "pearsons": [],
+                "kendalls": [],
+                "spearmans": [],
+                "dots": [],
+                "ssds": [],
+                "kls": [],
+            }
 
         # pearsons
         if self.best_match[result.base_name]["pearsons"] == {}:
@@ -231,6 +287,10 @@ class MultiComparison:
                     "elm": result.elm,
                     "result": result.comparison_results[0][1],
                 }
+        self.all_ranks[result.base_name]["pearsons"].append({
+                "elm": result.elm,
+                "result": result.comparison_results[0][1],
+            })
 
         # kendalls
         if self.best_match[result.base_name]["kendalls"] == {}:
@@ -245,6 +305,11 @@ class MultiComparison:
                     "elm": result.elm,
                     "result": result.comparison_results_kendalls[0][1],
                 }
+        self.all_ranks[result.base_name]["kendalls"].append({
+                "elm": result.elm,
+                "result": result.comparison_results_kendalls[0][1],
+            })
+
 
         # spearmans
         if self.best_match[result.base_name]["spearmans"] == {}:
@@ -259,6 +324,10 @@ class MultiComparison:
                     "elm": result.elm,
                     "result": result.comparison_results_spearmans[0][1],
                 }
+        self.all_ranks[result.base_name]["spearmans"].append({
+                "elm": result.elm,
+                "result": result.comparison_results_spearmans[0][1],
+            })
 
         # dots
         if self.best_match[result.base_name]["dots"] == {}:
@@ -273,6 +342,10 @@ class MultiComparison:
                     "elm": result.elm,
                     "result": result.comparison_results_dots[0][1],
                 }
+        self.all_ranks[result.base_name]["dots"].append({
+                "elm": result.elm,
+                "result": result.comparison_results_dots[0][1],
+            })
 
         # ssds
         if self.best_match[result.base_name]["ssds"] == {}:
@@ -287,6 +360,11 @@ class MultiComparison:
                     "elm": result.elm,
                     "result": result.comparison_results_ssds[0][1],
                 }
+        self.all_ranks[result.base_name]["ssds"].append({
+                "elm": result.elm,
+                "result": result.comparison_results_ssds[0][1],
+            })
+        
 
         # kls
         if self.best_match[result.base_name]["kls"] == {}:
@@ -301,8 +379,19 @@ class MultiComparison:
                     "elm": result.elm,
                     "result": result.comparison_results_kls[0][1],
                 }
+        self.all_ranks[result.base_name]["kls"].append({
+                "elm": result.elm,
+                "result": result.comparison_results_kls[0][1],
+            })
 
     def add_multi_metrics(self, result):
+        """
+        A result is considered correct when the predicted ELM class returned from each similarity metric
+        is the same as the examined ELM class. (A match is a when the best result is itself)
+        Subsequently, it appends the result in the respective match/mismatch lists
+        for every simmilarity metric.
+        """
+
         if result.base_name == result.elm:
             self.multi_metrics["pearsons"]["match"].append(
                 result.comparison_results[0][1]
@@ -322,6 +411,7 @@ class MultiComparison:
             self.multi_metrics["kls"]["match"].append(
                 result.comparison_results_kls[0][1]
             )
+            
         else:
             self.multi_metrics["pearsons"]["mismatch"].append(
                 result.comparison_results[0][1]
@@ -351,6 +441,16 @@ class MultiComparison:
                 "ssds": {},
                 "kls": {},
             }
+        
+        if result.base_name not in self.all_ranks:
+            self.all_ranks[result.base_name] = {
+                "pearsons": [],
+                "kendalls": [],
+                "spearmans": [],
+                "dots": [],
+                "ssds": [],
+                "kls": [],
+            }
 
         # pearsons
         if self.best_match[result.base_name]["pearsons"] == {}:
@@ -366,6 +466,11 @@ class MultiComparison:
                     "result": result.comparison_results[0][1],
                 }
 
+        self.all_ranks[result.base_name]["pearsons"].append({
+                "elm": result.elm,
+                "result": result.comparison_results[0][1],
+            })
+
         # kendalls
         if self.best_match[result.base_name]["kendalls"] == {}:
             self.best_match[result.base_name]["kendalls"] = {
@@ -379,6 +484,10 @@ class MultiComparison:
                     "elm": result.elm,
                     "result": result.comparison_results_kendalls[0][1],
                 }
+        self.all_ranks[result.base_name]["kendalls"].append({
+                "elm": result.elm,
+                "result": result.comparison_results_kendalls[0][1],
+            })
 
         # spearmans
         if self.best_match[result.base_name]["spearmans"] == {}:
@@ -393,6 +502,10 @@ class MultiComparison:
                     "elm": result.elm,
                     "result": result.comparison_results_spearmans[0][1],
                 }
+        self.all_ranks[result.base_name]["spearmans"].append({
+                "elm": result.elm,
+                "result": result.comparison_results_spearmans[0][1],
+            })
 
         # dots
         if self.best_match[result.base_name]["dots"] == {}:
@@ -407,6 +520,10 @@ class MultiComparison:
                     "elm": result.elm,
                     "result": result.comparison_results_dots[0][1],
                 }
+        self.all_ranks[result.base_name]["dots"].append({
+                "elm": result.elm,
+                "result": result.comparison_results_dots[0][1],
+            })
 
         # ssds
         if self.best_match[result.base_name]["ssds"] == {}:
@@ -421,6 +538,10 @@ class MultiComparison:
                     "elm": result.elm,
                     "result": result.comparison_results_ssds[0][1],
                 }
+        self.all_ranks[result.base_name]["ssds"].append({
+                "elm": result.elm,
+                "result": result.comparison_results_ssds[0][1],
+            })
 
         # kls
         if self.best_match[result.base_name]["kls"] == {}:
@@ -435,7 +556,11 @@ class MultiComparison:
                     "elm": result.elm,
                     "result": result.comparison_results_kls[0][1],
                 }
-
+        self.all_ranks[result.base_name]["kls"].append({
+                "elm": result.elm,
+                "result": result.comparison_results_kls[0][1],
+            })
+        
     def mann_whitney_u_test(self):
         """
         Perform the Mann-Whitney U Test, comparing two different distributions.
@@ -531,6 +656,8 @@ class MultiComparison:
         ssds_match = 0
         kls_match = 0
 
+        print("\nself.best_match final\n",json.dumps(self.best_match), "\n")
+
         for pssm, data in self.best_match.items():
             if data["pearsons"]["elm"] == pssm:
                 pearsons_match += 1
@@ -568,7 +695,6 @@ class MultiComparison:
             ssds_match,
             kls_match,
         ]
-        print(json.dumps(self.best_match))
         fig, ax = plt.subplots()
         rects = ax.bar(
             y_pos,
@@ -593,8 +719,64 @@ class MultiComparison:
             )
         plt.show()
 
+    def plot_rank_boxplots(self):
+        for pssm, data in self.best_match.items():
+            if hasattr(self, "similarity_df"):
+                print("adding similarity best", pssm)
+            
+                self.similarity_df.at[pssm] = [
+                    data["pearsons"]["elm"],
+                    data["kendalls"]["elm"],
+                    data["spearmans"]["elm"],
+                    data["ssds"]["elm"],
+                    data["dots"]["elm"],
+                    data["kls"]["elm"]]
+
+
+
+        if self.correct_results != "":
+            for pssm, _ in self.all_ranks.items():
+                self.pearson_rank.extend(find_rank_file(self.all_ranks[pssm], self.correct_results[pssm], "pearsons"))
+                self.kendall_rank.extend(find_rank_file(self.all_ranks[pssm], self.correct_results[pssm], "kendalls"))
+                self.spearman_rank.extend(find_rank_file(self.all_ranks[pssm], self.correct_results[pssm], "spearmans"))
+                self.ssd_rank.extend(find_rank_file(self.all_ranks[pssm], self.correct_results[pssm], "ssds", reverse=False))
+                self.dot_rank.extend(find_rank_file(self.all_ranks[pssm], self.correct_results[pssm], "dots", reverse=False))
+                self.kl_rank.extend(find_rank_file(self.all_ranks[pssm], self.correct_results[pssm], "kls", reverse=False))
+ 
+        else:
+            for pssm, _ in self.all_ranks.items():
+                self.pearson_rank.extend(find_rank_name(self.all_ranks[pssm], pssm, "pearsons"))
+                self.kendall_rank.extend(find_rank_name(self.all_ranks[pssm], pssm, "kendalls"))
+                self.spearman_rank.extend(find_rank_name(self.all_ranks[pssm], pssm, "spearmans"))
+                self.ssd_rank.extend(find_rank_name(self.all_ranks[pssm], pssm, "ssds", reverse=False))
+                self.dot_rank.extend(find_rank_name(self.all_ranks[pssm], pssm, "dots", reverse=False))
+                self.kl_rank.extend(find_rank_name(self.all_ranks[pssm], pssm, "kls", reverse=False))
+
+        print("\nsorted new self.all_ranks final\n",json.dumps(self.all_ranks), "\n")
+        print("\nPearsons Rank ", self.pearson_rank) 
+        print("Kendalls Rank ", self.kendall_rank)
+        print("Spearmans Rank ", self.spearman_rank)
+        print("SSDs Rank ", self.ssd_rank)
+        print("Dot Rank ", self.dot_rank)
+        print("KL Rank ", self.kl_rank)
+
+        pearson_rank_df = pd.DataFrame(self.pearson_rank, columns=["Pearson"])
+        kendall_rank_df = pd.DataFrame(self.kendall_rank, columns=["Kendall"])
+        spearman_rank_df = pd.DataFrame(self.spearman_rank, columns=["Spearman"])
+        ssd_rank_df = pd.DataFrame(self.ssd_rank, columns=["SSD"])
+        dot_rank_df = pd.DataFrame(self.dot_rank, columns=["Dot"])  
+        kl_rank_df = pd.DataFrame(self.kl_rank, columns=["KL"])  
+
+        comb_df = pd.concat([pearson_rank_df, kendall_rank_df, spearman_rank_df, ssd_rank_df, dot_rank_df,kl_rank_df], axis=1)
+        mdf = pd.melt(comb_df)
+        mdf = mdf.rename(columns={"variable": "Similarity Metric", "value": "Correct Result Rank"})
+        my_pal = color=["cyan", "orange", "green", "red", "purple", "brown"]
+        ax = sns.boxplot(x="Similarity Metric", y="Correct Result Rank", data=mdf, palette=my_pal)
+       
+        plt.show()    
+     
     def plot_multi_roc(self):
-        print(json.dumps(self.multi_metrics))
+        print("\n",json.dumps(self.multi_metrics))
 
         plt.figure()
 
@@ -626,3 +808,5 @@ class MultiComparison:
             plt.legend(loc="lower right")
 
         plt.show()
+
+
