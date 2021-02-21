@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 
 def prepare_data():
@@ -138,4 +139,44 @@ def get_df_window(df1, df2, pep_window, i, j):
     b.columns = [ind for ind in range(0, len(b.columns))]
 
     return a, b
+
+def gini_weight(df):
+    """
+    Calculates the Gini Coefficient which is a measure of statistical dispersion.
+    Gini = 1 means maximal inequallity
+    Gini = 0 means perfect equallity where all the values are the same. 
+    """
+    d = {}
+    # df = df ** 2
+    for col in df.columns:
+        col_list = df[col].to_numpy()
+        mad = np.abs(np.subtract.outer(col_list, col_list)).mean()
+        rmad = mad / col_list.mean()
+        g1 = 0.5 * rmad
+        d[col] = g1
+        d_df = pd.DataFrame.from_dict(d, orient="index")
+        d_df = d_df.round(decimals=2)
+    return d_df
+
+
+
+def find_optimal_cutoff(target, predicted, label):
+    """ 
+    Find the optimal probability cutoff point for a classification model related to event rate
+    Parameters
+    ----------
+    target : Matrix with dependent or target data, where rows are observations
+
+    predicted : Matrix with predicted data, where rows are observations
+
+    Returns: list type, with optimal cutoff value
+        
+    """
+    fpr, tpr, threshold = roc_curve(target, predicted, pos_label=label)
+    i = np.arange(len(tpr)) 
+    roc = pd.DataFrame({'tf' : pd.Series(tpr-(1-fpr), index=i), 'threshold' : pd.Series(threshold, index=i)})
+    roc_t = roc.iloc[(roc.tf-0).abs().argsort()[:1]]
+
+    return list(roc_t['threshold']) 
+
 

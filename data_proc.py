@@ -12,8 +12,10 @@ import seaborn as sns
 from sklearn.metrics import auc, roc_curve
 from tqdm.auto import tqdm
 
-from utils import calculate_similarity, gini_weight, NoResultsError
+from data_prep import gini_weight, convert_to_df
 
+class NoResultsError(Exception):
+    pass
 
 def process_data(iters, multi_metrics=False):
     """
@@ -150,3 +152,122 @@ def calc_motif(df):
 
 
     return motif.join(motif_list)
+
+def calculate_similarity(df1, df2):
+    """
+    Calculates all the similarity measures column wise and returns 1 row dataframes.
+    """
+    kendalls = []
+    pearsons = []
+    spearmans = []
+    dots = []
+    ssds = []
+    kls = []
+
+    for i in range(0, len(df1.columns)):
+        dfi = df1.iloc[:, i]
+        dfj = df2.iloc[:, i]
+
+        kendall = calc_kendall_correlation(dfi, dfj)
+        pearson = calc_pearson_correlation(dfi, dfj)
+        spearman = calc_spearmans_correlation(dfi, dfj)
+        dot_product = calc_dot_product(dfi, dfj)
+        ssd = calc_sum_of_squared_distance(dfi, dfj)
+        kl = calc_Kullback_Leibler_distance(dfi, dfj)
+
+        kendalls.append(kendall)
+        pearsons.append(pearson)
+        spearmans.append(spearman)
+        dots.append(dot_product)
+        ssds.append(ssd)
+        kls.append(kl)
+
+    kendalls_df = convert_to_df(kendalls, "Kendall")
+    pearsons_df = convert_to_df(pearsons, "Pearson")
+    spearmans_df = convert_to_df(spearmans, "Spearman")
+    dots_df = convert_to_df(dots, "Dot")
+    ssds_df = convert_to_df(ssds, "SSD")
+    kls_df = convert_to_df(kls, "KL")
+
+    return kendalls_df, pearsons_df, spearmans_df, dots_df, ssds_df, kls_df
+
+
+def calc_kendall_correlation(dfi, dfj):
+    """
+    Calculates Kendall's correlation between two dataframes and rescales them
+    from -1 - 1 to 0-1. 
+    Order is decreasing.
+    """
+    kendall = dfi.corr(dfj, method="kendall")
+    kendall = round(kendall, 3)
+
+    # Turning the correlation coefficient scale from -1 - 1 to 0-1
+    # kendalls_scale = (kendall + 1) / 2
+    # kendalls_scale = round(kendalls_scale, 3)
+
+    return kendall
+
+def calc_pearson_correlation(dfi, dfj):
+    """
+    Calculates Pearson's correlation between two dataframes and rescales them
+    from -1 - 1 to 0-1. 
+    Order is decreasing.
+    """
+    pearson = dfi.corr(dfj)
+    pearson = pearson.round(decimals=3)
+
+    # Turning the correlation coefficient scale from -1 - 1 to 0-1
+    # pearson_scale = (pearson + 1) / 2
+    # pearson_scale = pearson_scale.round(decimals=3)
+
+    return pearson
+
+def calc_spearmans_correlation(dfi, dfj):
+    """
+    Calculates the Spearman's correlation between two dataframes and rescales them
+    from -1 - 1 to 0-1. 
+    Order is decreasing.
+    """
+    spearman = dfi.corr(dfj, method="spearman")
+    spearman = round(spearman, 3)
+
+    # Turning the correlation coefficient scale from -1 - 1 to 0-1
+    # spearmans_scale = (spearman + 1) / 2
+    # spearmans_scale = round(spearmans_scale, 3)
+
+    return spearman
+
+def calc_dot_product(dfi, dfj):
+    """
+    Calculates the dot product between 2 dataframes and returns their sum.
+    Order is ascending.
+    """
+    dot_product = dfi.values * dfj.values
+    dot_product_sum = dot_product.sum().round(decimals=3)
+
+    return dot_product_sum
+
+def calc_sum_of_squared_distance(dfi, dfj):
+    """
+    Calculates the square distance between 2 dataframes and returns their sum.
+    Order is ascending.
+    """
+    ssd = (dfi - dfj) ** 2
+    ssd_sum = ssd.sum().round(decimals=3)
+
+    return ssd_sum
+
+def calc_Kullback_Leibler_distance(dfi, dfj):
+    """
+    Calculates the Kullback-Leibler distance of the two matrices. 
+    As defined in Aerts et al. (2003). Also called Mutual Information.
+    Sort will be ascending.
+    Epsilon is used here to avoid conditional code for checking that neither P nor Q is equal to 0.
+    """
+    epsilon = 0.00001
+
+    P = dfi + epsilon
+    Q = dfj + epsilon
+    divergence = np.sum(P * np.log2(P / Q))
+
+    return divergence

@@ -3,7 +3,7 @@ import operator
 
 from commands import (compare_combined_file, compare_single_to_combined_file,
                       compare_two_combined_new, compare_two_files_new)
-from utils import (plot_important_positions)
+from data_output import (plot_important_positions)
 
 # pep_window = 4
 buffer = 1
