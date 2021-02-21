@@ -76,9 +76,6 @@ def calc_brute_force_window(df1, df2):
         max_diff = len(df1.columns)
     return [x for x in range(1, max_diff + 1)]
 
-def calc_asdf_window(df1, df2):
-    pass
-
 def gini_window_index(df):
     """
     Finds all the important positions of a PSSM. Important positions are all
@@ -319,10 +316,10 @@ def calc_spearmans_correlation(dfi, dfj):
     spearman = round(spearman, 3)
 
     # Turning the correlation coefficient scale from -1 - 1 to 0-1
-    spearmans_scale = (spearman + 1) / 2
-    spearmans_scale = round(spearmans_scale, 3)
+    # spearmans_scale = (spearman + 1) / 2
+    # spearmans_scale = round(spearmans_scale, 3)
 
-    return spearmans_scale
+    return spearman
 
 
 def calc_kendall_correlation(dfi, dfj):
@@ -335,10 +332,10 @@ def calc_kendall_correlation(dfi, dfj):
     kendall = round(kendall, 3)
 
     # Turning the correlation coefficient scale from -1 - 1 to 0-1
-    kendalls_scale = (kendall + 1) / 2
-    kendalls_scale = round(kendalls_scale, 3)
+    # kendalls_scale = (kendall + 1) / 2
+    # kendalls_scale = round(kendalls_scale, 3)
 
-    return kendalls_scale
+    return kendall
 
 
 def calculate_similarity(df1, df2):
@@ -356,16 +353,16 @@ def calculate_similarity(df1, df2):
         dfi = df1.iloc[:, i]
         dfj = df2.iloc[:, i]
 
-        kendalls_scale = calc_kendall_correlation(dfi, dfj)
-        pearsons_scale = calc_pearson_correlation(dfi, dfj)
-        spearmans_scale = calc_spearmans_correlation(dfi, dfj)
+        kendall = calc_kendall_correlation(dfi, dfj)
+        pearson = calc_pearson_correlation(dfi, dfj)
+        spearman = calc_spearmans_correlation(dfi, dfj)
         dot_product = calc_dot_product(dfi, dfj)
         ssd = calc_sum_of_squared_distance(dfi, dfj)
         kl = calc_Kullback_Leibler_distance(dfi, dfj)
 
-        kendalls.append(kendalls_scale)
-        pearsons.append(pearsons_scale)
-        spearmans.append(spearmans_scale)
+        kendalls.append(kendall)
+        pearsons.append(pearson)
+        spearmans.append(spearman)
         dots.append(dot_product)
         ssds.append(ssd)
         kls.append(kl)
