@@ -45,10 +45,8 @@ def process_data(iters, multi_metrics=False):
         b_gini_df = gini_weight(b_df)
         b_gini_df = b_gini_df.T
 
-        # print("calculating simliarity")
         (kendalls, pearsons_cor, spearmans, dots, ssds, kls) = calculate_similarity(a_df, b_df)
 
-        # print("done")
         comparison = pd.DataFrame(
             pearsons_cor.values * a_gini_df.values * b_gini_df.values,
             columns=pearsons_cor.columns,
@@ -143,7 +141,6 @@ def calc_motif(df):
         if gini_df.values[0][0] >= cutoff:
             ind = df[df[col] == df[col].max()].index.tolist()
             motif_list.append(ind[0])
-        # elif df[col].max() >= mean_cutoff:
         elif gini_df.values[0][0] >= mean_cutoff:
             ind = df[df[col] == df[col].max()].index.tolist()
             motif_list.append(ind[0])
@@ -201,10 +198,6 @@ def calc_kendall_correlation(dfi, dfj):
     kendall = dfi.corr(dfj, method="kendall")
     kendall = round(kendall, 3)
 
-    # Turning the correlation coefficient scale from -1 - 1 to 0-1
-    # kendalls_scale = (kendall + 1) / 2
-    # kendalls_scale = round(kendalls_scale, 3)
-
     return kendall
 
 def calc_pearson_correlation(dfi, dfj):
@@ -216,10 +209,6 @@ def calc_pearson_correlation(dfi, dfj):
     pearson = dfi.corr(dfj)
     pearson = pearson.round(decimals=3)
 
-    # Turning the correlation coefficient scale from -1 - 1 to 0-1
-    # pearson_scale = (pearson + 1) / 2
-    # pearson_scale = pearson_scale.round(decimals=3)
-
     return pearson
 
 def calc_spearmans_correlation(dfi, dfj):
@@ -230,10 +219,6 @@ def calc_spearmans_correlation(dfi, dfj):
     """
     spearman = dfi.corr(dfj, method="spearman")
     spearman = round(spearman, 3)
-
-    # Turning the correlation coefficient scale from -1 - 1 to 0-1
-    # spearmans_scale = (spearman + 1) / 2
-    # spearmans_scale = round(spearmans_scale, 3)
 
     return spearman
 
