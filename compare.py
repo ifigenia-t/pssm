@@ -1,19 +1,27 @@
 import argparse
 import operator
 
-from commands import (compare_combined_file, compare_single_to_combined_file,
-                      compare_two_combined_new, compare_two_files_new)
-from data_output import (plot_important_positions)
+from commands import (
+    compare_combined_file,
+    compare_single_to_combined_file,
+    compare_two_combined_new,
+    compare_two_files_new,
+)
+from data_output import plot_important_positions
 
 # pep_window = 4
 buffer = 1
 
 parser = argparse.ArgumentParser(description="")
 parser.add_argument(
-    "--base_file", "-bf", help="base file to be used for the comparison",
+    "--base_file",
+    "-bf",
+    help="base file to be used for the comparison",
 )
 parser.add_argument(
-    "--second_file", "-sf", help="file to be used for the comparison",
+    "--second_file",
+    "-sf",
+    help="file to be used for the comparison",
 )
 parser.add_argument(
     "--combined_file",
@@ -43,7 +51,16 @@ parser.add_argument(
     "--correct_results_file", "-crf", help="Correct results file to compaire against"
 )
 parser.add_argument(
-    "--multi_metrics", "-mm", default = False, help="Return multiple similarity metrics from comparison"
+    "--multi_metrics",
+    "-mm",
+    default=False,
+    help="Return multiple similarity metrics from comparison",
+)
+parser.add_argument(
+    "--similarity_metric",
+    "-sm",
+    default=["pearson"],
+    help="Similarity metrics used for the comparison",
 )
 args = parser.parse_args()
 
@@ -63,12 +80,12 @@ elif args.second_file or args.combined_file:
 if args.second_file:
     second_file = args.second_file
 
-    compare_two_files_new(base_file, second_file, 4)
+    compare_two_files_new(base_file, second_file, 4, args.similarity_metric)
 
 
 if args.combined_file:
     combined_file = args.combined_file
-    compare_single_to_combined_file(base_file, combined_file)
+    compare_single_to_combined_file(base_file, combined_file, args.similarity_metric)
 
 if args.two_comb_files:
     if len(args.two_comb_files) != 2:
@@ -81,13 +98,20 @@ if args.two_comb_files:
     print(args.two_comb_files)
     multi_metrics = args.multi_metrics
     file1, file2 = args.two_comb_files[0], args.two_comb_files[1]
-    compare_two_combined_new(file1, file2, correct_results_file, multi_metrics=multi_metrics)
+    compare_two_combined_new(
+        file1,
+        file2,
+        args.similarity_metric,
+        correct_results_file,
+        multi_metrics=multi_metrics,
+    )
 
 if args.single_file:
     single_file = args.single_file
     multi_metrics = args.multi_metrics
-    results = compare_combined_file(single_file, multi_metrics=multi_metrics)
-
+    results = compare_combined_file(
+        single_file, args.similarity_metric, multi_metrics=multi_metrics
+    )
 
     # for result in results:
     #     print(

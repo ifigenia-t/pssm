@@ -14,17 +14,15 @@ from data_proc import process_data
 from result import Result
 
 
-def compare_combined_file(file1, multi_metrics = False):
+def compare_combined_file(file1, similarity_metric, multi_metrics=False):
     """
     Opens one json file containing multiple PSSMs and compares them all to eachother.
     """
     with open(file1) as json_file_1:
         data1 = json.load(json_file_1)
 
-        multi_comp = MultiComparison(
-            data1, data1
-        )
-        
+        multi_comp = MultiComparison(data1, data1)
+
         for base_pssm in tqdm(data1):
             base_file = json.dumps(data1[base_pssm]["pssm"])
 
@@ -42,7 +40,9 @@ def compare_combined_file(file1, multi_metrics = False):
 
                     iters = get_dfs_backwards_sliding(df1_norm, df2_norm)
 
-                    res = process_data(iters, multi_metrics = multi_metrics)
+                    res = process_data(
+                        iters, similarity_metric, multi_metrics=multi_metrics
+                    )
 
                     res.base_name = data1[base_pssm]["motif"]
                     res.elm = data1[pssm]["motif"]
@@ -72,7 +72,7 @@ def compare_combined_file(file1, multi_metrics = False):
     #     multi_comp.plot_ROC()
 
 
-def compare_single_to_combined_file(file1, file2):
+def compare_single_to_combined_file(file1, file2, similarity_metric):
     """
     Opens two files, one containing one single PSSM and the other multiple PSSMs.
     Compares the single PSSM to all the multiple ones a
@@ -104,7 +104,7 @@ def compare_single_to_combined_file(file1, file2):
 
             iters = get_dfs_backwards_sliding(df1_norm, df2_norm)
 
-            res = process_data(iters)
+            res = process_data(iters, similarity_metric)
 
             res.base_name = filename
             res.elm = data2[pssm]["motif"]
@@ -122,7 +122,9 @@ def compare_single_to_combined_file(file1, file2):
     comp.create_file()
 
 
-def compare_two_combined_new(file1, file2, correct_results_file="", multi_metrics = False):
+def compare_two_combined_new(
+    file1, file2, similarity_metric, correct_results_file="", multi_metrics=False
+):
     """
     Opens two json files containing multiple PSSMs and compares them all to eachother.
     Output is a csv table containing the best results of the comparison.
@@ -155,7 +157,9 @@ def compare_two_combined_new(file1, file2, correct_results_file="", multi_metric
 
                     iters = get_dfs_backwards_sliding(df1_norm, df2_norm)
 
-                    res = process_data(iters, multi_metrics = multi_metrics)
+                    res = process_data(
+                        iters, similarity_metric, multi_metrics=multi_metrics
+                    )
 
                     res.base_name = data1[base_pssm]["motif"]
                     res.elm = data2[pssm]["motif"]
@@ -185,7 +189,9 @@ def compare_two_combined_new(file1, file2, correct_results_file="", multi_metric
     #     multi_comp.plot_ROC()
 
 
-def compare_two_files_new(base_file, second_file, pep_window, backwards_reading=False):
+def compare_two_files_new(
+    base_file, second_file, similarity_metric, pep_window, backwards_reading=False
+):
     """
     Calculate all the comparisons for two PSSMs
     """
@@ -197,6 +203,6 @@ def compare_two_files_new(base_file, second_file, pep_window, backwards_reading=
 
     iters = get_dfs_backwards_sliding(df1_norm, df2_norm)
 
-    res = process_data(iters)
+    res = process_data(iters, similarity_metric)
 
     output_data(res.comparison_results)

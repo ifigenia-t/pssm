@@ -14,17 +14,19 @@ from tqdm.auto import tqdm
 
 from data_prep import gini_weight, convert_to_df
 
+
 class NoResultsError(Exception):
     pass
 
-def process_data(iters, multi_metrics=False):
+
+def process_data(iters, similarity_metric, multi_metrics=False):
     """
     Compares two matrices using a window of comparison and returns a dictionary
     containing the positions of each matrix and the SSD
     """
     results = {}
     results_kendalls = {}
-    results_spearmans ={}
+    results_spearmans = {}
     results_dots = {}
     results_ssds = {}
     results_kls = {}
@@ -45,7 +47,9 @@ def process_data(iters, multi_metrics=False):
         b_gini_df = gini_weight(b_df)
         b_gini_df = b_gini_df.T
 
-        (kendalls, pearsons_cor, spearmans, dots, ssds, kls) = calculate_similarity(a_df, b_df)
+        (kendalls, pearsons_cor, spearmans, dots, ssds, kls) = calculate_similarity(
+            a_df, b_df, similarity_metric
+        )
 
         comparison = pd.DataFrame(
             pearsons_cor.values * a_gini_df.values * b_gini_df.values,
@@ -55,38 +59,35 @@ def process_data(iters, multi_metrics=False):
 
         if multi_metrics:
             comparison_kendalls = pd.DataFrame(
-            kendalls.values * a_gini_df.values * b_gini_df.values,
-            columns=kendalls.columns,
-            index=kendalls.index,
+                kendalls.values * a_gini_df.values * b_gini_df.values,
+                columns=kendalls.columns,
+                index=kendalls.index,
             )
             comparison_spearmans = pd.DataFrame(
-            spearmans.values * a_gini_df.values * b_gini_df.values,
-            columns=spearmans.columns,
-            index=spearmans.index,
+                spearmans.values * a_gini_df.values * b_gini_df.values,
+                columns=spearmans.columns,
+                index=spearmans.index,
             )
             comparison_dots = pd.DataFrame(
-            dots.values * a_gini_df.values * b_gini_df.values,
-            columns=dots.columns,
-            index=dots.index,
+                dots.values * a_gini_df.values * b_gini_df.values,
+                columns=dots.columns,
+                index=dots.index,
             )
             comparison_ssds = pd.DataFrame(
-            ssds.values * a_gini_df.values * b_gini_df.values,
-            columns=ssds.columns,
-            index=ssds.index,
+                ssds.values * a_gini_df.values * b_gini_df.values,
+                columns=ssds.columns,
+                index=ssds.index,
             )
             comparison_kls = pd.DataFrame(
-            kls.values * a_gini_df.values * b_gini_df.values,
-            columns=kls.columns,
-            index=kls.index,
+                kls.values * a_gini_df.values * b_gini_df.values,
+                columns=kls.columns,
+                index=kls.index,
             )
             results_kendalls[key] = comparison_kendalls.values.sum().round(decimals=3)
             results_spearmans[key] = comparison_spearmans.values.sum().round(decimals=3)
-            results_dots[key] = comparison_dots.values.sum().round(decimals=3) 
-            results_ssds[key] = comparison_ssds.values.sum().round(decimals=3) 
+            results_dots[key] = comparison_dots.values.sum().round(decimals=3)
+            results_ssds[key] = comparison_ssds.values.sum().round(decimals=3)
             results_kls[key] = comparison_kls.values.sum().round(decimals=3)
-
-
-
 
         results[key] = comparison.values.sum().round(decimals=3)
         pearsons[key] = pearsons_cor
@@ -117,20 +118,30 @@ def process_data(iters, multi_metrics=False):
         motif_1=motif_1,
         motif_2=motif_2,
     )
-    
+
     if multi_metrics:
-        res.comparison_results_kendalls = sorted(results_kendalls.items(), key=operator.itemgetter(1), reverse=True)
-        res.comparison_results_spearmans = sorted(results_spearmans.items(), key=operator.itemgetter(1), reverse=True)
-        res.comparison_results_dots = sorted(results_dots.items(), key=operator.itemgetter(1))
-        res.comparison_results_ssds = sorted(results_ssds.items(), key=operator.itemgetter(1))
-        res.comparison_results_kls = sorted(results_kls.items(), key=operator.itemgetter(1))
+        res.comparison_results_kendalls = sorted(
+            results_kendalls.items(), key=operator.itemgetter(1), reverse=True
+        )
+        res.comparison_results_spearmans = sorted(
+            results_spearmans.items(), key=operator.itemgetter(1), reverse=True
+        )
+        res.comparison_results_dots = sorted(
+            results_dots.items(), key=operator.itemgetter(1)
+        )
+        res.comparison_results_ssds = sorted(
+            results_ssds.items(), key=operator.itemgetter(1)
+        )
+        res.comparison_results_kls = sorted(
+            results_kls.items(), key=operator.itemgetter(1)
+        )
 
     return res
 
 
 def calc_motif(df):
     motif = ""
-    motif_list =[]
+    motif_list = []
     cutoff = 0.58
     gini_df = gini_weight(df)
     gini_mean = gini_df.mean()
@@ -147,10 +158,10 @@ def calc_motif(df):
         else:
             motif_list.append("x")
 
-
     return motif.join(motif_list)
 
-def calculate_similarity(df1, df2):
+
+def calculate_similarity(df1, df2, similarity_metric):
     """
     Calculates all the similarity measures column wise and returns 1 row dataframes.
     """
@@ -160,31 +171,51 @@ def calculate_similarity(df1, df2):
     dots = []
     ssds = []
     kls = []
+    kendalls_df = None
+    pearsons_df = None
+    spearmans_df = None
+    dots_df = None
+    ssds_df = None
+    kls_df = None
 
     for i in range(0, len(df1.columns)):
         dfi = df1.iloc[:, i]
         dfj = df2.iloc[:, i]
 
-        kendall = calc_kendall_correlation(dfi, dfj)
-        pearson = calc_pearson_correlation(dfi, dfj)
-        spearman = calc_spearmans_correlation(dfi, dfj)
-        dot_product = calc_dot_product(dfi, dfj)
-        ssd = calc_sum_of_squared_distance(dfi, dfj)
-        kl = calc_Kullback_Leibler_distance(dfi, dfj)
+        if "kendall" in similarity_metric:
+            kendall = calc_kendall_correlation(dfi, dfj)
+            kendalls.append(kendall)
 
-        kendalls.append(kendall)
-        pearsons.append(pearson)
-        spearmans.append(spearman)
-        dots.append(dot_product)
-        ssds.append(ssd)
-        kls.append(kl)
+        if "pearson" in similarity_metric:
+            pearson = calc_pearson_correlation(dfi, dfj)
+            pearsons.append(pearson)
 
-    kendalls_df = convert_to_df(kendalls, "Kendall")
-    pearsons_df = convert_to_df(pearsons, "Pearson")
-    spearmans_df = convert_to_df(spearmans, "Spearman")
-    dots_df = convert_to_df(dots, "Dot")
-    ssds_df = convert_to_df(ssds, "SSD")
-    kls_df = convert_to_df(kls, "KL")
+        if "spearman" in similarity_metric:
+            spearman = calc_spearmans_correlation(dfi, dfj)
+            spearmans.append(spearman)
+
+        if "dot" in similarity_metric:
+            dot_product = calc_dot_product(dfi, dfj)
+            dots.append(dot_product)
+        if "ssd" in similarity_metric:
+            ssd = calc_sum_of_squared_distance(dfi, dfj)
+            ssds.append(ssd)
+        if "kl" in similarity_metric:
+            kl = calc_Kullback_Leibler_distance(dfi, dfj)
+            kls.append(kl)
+
+    if "kendall" in similarity_metric:
+        kendalls_df = convert_to_df(kendalls, "Kendall")
+    if "pearson" in similarity_metric:
+        pearsons_df = convert_to_df(pearsons, "Pearson")
+    if "spearman" in similarity_metric:
+        spearmans_df = convert_to_df(spearmans, "Spearman")
+    if "dot" in similarity_metric:
+        dots_df = convert_to_df(dots, "Dot")
+    if "ssd" in similarity_metric:
+        ssds_df = convert_to_df(ssds, "SSD")
+    if "kl" in similarity_metric:
+        kls_df = convert_to_df(kls, "KL")
 
     return kendalls_df, pearsons_df, spearmans_df, dots_df, ssds_df, kls_df
 
@@ -192,7 +223,7 @@ def calculate_similarity(df1, df2):
 def calc_kendall_correlation(dfi, dfj):
     """
     Calculates Kendall's correlation between two dataframes and rescales them
-    from -1 - 1 to 0-1. 
+    from -1 - 1 to 0-1.
     Order is decreasing.
     """
     kendall = dfi.corr(dfj, method="kendall")
@@ -200,10 +231,11 @@ def calc_kendall_correlation(dfi, dfj):
 
     return kendall
 
+
 def calc_pearson_correlation(dfi, dfj):
     """
     Calculates Pearson's correlation between two dataframes and rescales them
-    from -1 - 1 to 0-1. 
+    from -1 - 1 to 0-1.
     Order is decreasing.
     """
     pearson = dfi.corr(dfj)
@@ -211,16 +243,18 @@ def calc_pearson_correlation(dfi, dfj):
 
     return pearson
 
+
 def calc_spearmans_correlation(dfi, dfj):
     """
     Calculates the Spearman's correlation between two dataframes and rescales them
-    from -1 - 1 to 0-1. 
+    from -1 - 1 to 0-1.
     Order is decreasing.
     """
     spearman = dfi.corr(dfj, method="spearman")
     spearman = round(spearman, 3)
 
     return spearman
+
 
 def calc_dot_product(dfi, dfj):
     """
@@ -232,6 +266,7 @@ def calc_dot_product(dfi, dfj):
 
     return dot_product_sum
 
+
 def calc_sum_of_squared_distance(dfi, dfj):
     """
     Calculates the square distance between 2 dataframes and returns their sum.
@@ -242,9 +277,10 @@ def calc_sum_of_squared_distance(dfi, dfj):
 
     return ssd_sum
 
+
 def calc_Kullback_Leibler_distance(dfi, dfj):
     """
-    Calculates the Kullback-Leibler distance of the two matrices. 
+    Calculates the Kullback-Leibler distance of the two matrices.
     As defined in Aerts et al. (2003). Also called Mutual Information.
     Sort will be ascending.
     Epsilon is used here to avoid conditional code for checking that neither P nor Q is equal to 0.
