@@ -146,6 +146,7 @@ def gini_weight(df):
     Gini = 1 means maximal inequallity
     Gini = 0 means perfect equallity where all the values are the same. 
     """
+    # gini_df = pd.DataFrame(columns=df.columns)
     d = {}
     for col in df.columns:
         col_list = df[col].to_numpy()
@@ -153,8 +154,11 @@ def gini_weight(df):
         rmad = mad / col_list.mean()
         g1 = 0.5 * rmad
         d[col] = g1
-        d_df = pd.DataFrame.from_dict(d, orient="index")
-        d_df = d_df.round(decimals=2)
+        # TODO must fix, takes time
+
+    d_df = pd.DataFrame.from_dict(d, orient="index")
+    d_df = d_df.round(decimals=2)
+
     return d_df
 
 
