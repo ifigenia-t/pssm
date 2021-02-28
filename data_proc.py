@@ -83,13 +83,13 @@ def process_data(iters, similarity_metric, multi_metrics=False):
                 columns=kls.columns,
                 index=kls.index,
             )
-            results_kendalls[key] = comparison_kendalls.values.sum().round(decimals=3)
-            results_spearmans[key] = comparison_spearmans.values.sum().round(decimals=3)
-            results_dots[key] = comparison_dots.values.sum().round(decimals=3)
-            results_ssds[key] = comparison_ssds.values.sum().round(decimals=3)
-            results_kls[key] = comparison_kls.values.sum().round(decimals=3)
+            results_kendalls[key] = comparison_kendalls.values.sum()
+            results_spearmans[key] = comparison_spearmans.values.sum()
+            results_dots[key] = comparison_dots.values.sum()
+            results_ssds[key] = comparison_ssds.values.sum()
+            results_kls[key] = comparison_kls.values.sum()
 
-        results[key] = comparison.values.sum().round(decimals=3)
+        results[key] = comparison.values.sum()
         pearsons[key] = pearsons_cor
         ginis_1[key] = a_gini_df
         ginis_2[key] = b_gini_df
@@ -227,7 +227,7 @@ def calc_kendall_correlation(dfi, dfj):
     Order is decreasing.
     """
     kendall = dfi.corr(dfj, method="kendall")
-    kendall = round(kendall, 3)
+    # kendall = round(kendall, 3)
 
     return kendall
 
@@ -239,7 +239,7 @@ def calc_pearson_correlation(dfi, dfj):
     Order is decreasing.
     """
     pearson = dfi.corr(dfj)
-    pearson = pearson.round(decimals=3)
+    # pearson = pearson.round(decimals=3)
 
     return pearson
 
@@ -251,7 +251,7 @@ def calc_spearmans_correlation(dfi, dfj):
     Order is decreasing.
     """
     spearman = dfi.corr(dfj, method="spearman")
-    spearman = round(spearman, 3)
+    # spearman = round(spearman, 3)
 
     return spearman
 
@@ -262,7 +262,7 @@ def calc_dot_product(dfi, dfj):
     Order is ascending.
     """
     dot_product = dfi.values * dfj.values
-    dot_product_sum = dot_product.sum().round(decimals=3)
+    dot_product_sum = dot_product.sum() #.round(decimals=3)
 
     return dot_product_sum
 
@@ -273,7 +273,7 @@ def calc_sum_of_squared_distance(dfi, dfj):
     Order is ascending.
     """
     ssd = (dfi - dfj) ** 2
-    ssd_sum = ssd.sum().round(decimals=3)
+    ssd_sum = ssd.sum() #.round(decimals=3)
 
     return ssd_sum
 

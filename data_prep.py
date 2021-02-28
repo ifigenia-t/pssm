@@ -15,7 +15,6 @@ def prepare_matrix(filename):
     df = df.dropna(axis=1, how="all")
     df_proc = df.T
     df_proc = df_proc.dropna()
-    df_proc = df_proc.round(decimals=1)
     df_proc = df_proc.sort_index(axis=0)
     return df_proc
 
@@ -28,7 +27,6 @@ def normalise_matrix(df):
     """
     normalized_df = df - df.min()
     normalized_df = normalized_df / normalized_df.sum()
-    normalized_df = normalized_df.round(decimals=2)
     return normalized_df
 
 
@@ -157,7 +155,7 @@ def gini_weight(df):
         # TODO must fix, takes time
 
     d_df = pd.DataFrame.from_dict(d, orient="index")
-    d_df = d_df.round(decimals=2)
+    # d_df = d_df.round(decimals=2)
 
     return d_df
 
