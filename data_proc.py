@@ -19,7 +19,7 @@ class NoResultsError(Exception):
     pass
 
 
-def process_data(iters, similarity_metric, multi_metrics=False):
+def process_data(iters, similarity_metric, multi_metrics=False, correct_results_file=""):
     """
     Compares two matrices using a window of comparison and returns a dictionary
     containing the positions of each matrix and the SSD
@@ -51,6 +51,7 @@ def process_data(iters, similarity_metric, multi_metrics=False):
             a_df, b_df, similarity_metric
         )
 
+        # Main Comparison Calculation
         comparison = pd.DataFrame(
             pearsons_cor.values * a_gini_df.values * b_gini_df.values,
             columns=pearsons_cor.columns,
@@ -138,6 +139,14 @@ def process_data(iters, similarity_metric, multi_metrics=False):
 
     return res
 
+def find_rank_name(elms, pssm, metric, reverse=True):
+    ranks = []
+    elms[metric].sort(key=operator.itemgetter("result"), reverse=reverse)
+    for i, e in enumerate(elms[metric]):
+        if e["elm"] == pssm:
+            ranks.append(i)
+
+    return ranks
 
 def calc_motif(df):
     motif = ""

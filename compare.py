@@ -48,7 +48,7 @@ parser.add_argument(
     "--boxplot", "-box", help="Boxplot the important vs the unimportant positions"
 )
 parser.add_argument(
-    "--correct_results_file", "-crf", help="Correct results file to compaire against"
+    "--correct_results_file", "-crf", default = "" ,help="Correct results file to compaire against"
 )
 parser.add_argument(
     "--multi_metrics",
@@ -109,8 +109,10 @@ if args.two_comb_files:
 if args.single_file:
     single_file = args.single_file
     multi_metrics = args.multi_metrics
+    if args.correct_results_file:
+        correct_results_file = args.correct_results_file
     results = compare_combined_file(
-        single_file, args.similarity_metric, multi_metrics=multi_metrics
+        single_file, args.similarity_metric, multi_metrics=multi_metrics, correct_results_file=correct_results_file
     )
 
     # for result in results:

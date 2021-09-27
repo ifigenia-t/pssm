@@ -62,10 +62,10 @@ class MultiComparison:
     def __init__(
         self,
         data_file_1,
-        data_file_2="",
-        file_name="",
-        use_index=True,
-        correct_results_file="",
+        data_file_2 = "",
+        file_name = "",
+        use_index = True,
+        correct_results_file = "",
     ):
         self.multi_metrics = {
             "pearsons": {"match": [], "mismatch": []},
@@ -78,6 +78,7 @@ class MultiComparison:
 
         self.best_match = {}
         self.all_ranks = {}
+        self.all_results = {}
 
         self.pearson_rank = []
         self.kendall_rank = []
@@ -89,7 +90,10 @@ class MultiComparison:
         if use_index:
             data_1_names = []
             for pssm in data_file_1:
-                data_1_names.append(data_file_1[pssm]["motif"])
+                # for the dms dataset
+                data_1_names.append(pssm)
+                # for the PropPD dataset 
+                # data_1_names.append(data_file_1[pssm]["motif"])
         else:
             data_1_names = [file_name]
 
@@ -122,7 +126,10 @@ class MultiComparison:
         if data_file_2 != "":
             data_2_names = []
             for pssm in data_file_2:
-                data_2_names.append(data_file_2[pssm]["motif"])
+                # for dms
+                data_2_names.append(pssm)
+                # # for ELM  
+                # data_2_names.append(data_file_2[pssm]["motif"])
             self.all_df = pd.DataFrame(columns=data_1_names, index=data_2_names)
 
         if correct_results_file != "":
@@ -131,17 +138,114 @@ class MultiComparison:
                 self.match = []
                 self.mismatch = []
 
-    def create_file(self):
+    def del_nan_values(self):
+
+        for pssm in self.all_results:
+            for key, value in list(self.all_results[pssm].items()):
+                check_float = isinstance(value, float)
+                if (check_float == False):
+                    del self.all_results[pssm][key]
+
+    def create_ranks(self,correct_results_file):
+        ranked = {}
+        for pssm in self.all_results:
+            ranked[pssm] = rank_dict(self.all_results[pssm])
+            
+        correct_res_rank = {}
+        if correct_results_file == "":
+            for pssm_correct in ranked:
+                if pssm_correct not in ranked[pssm_correct]:
+                    correct_res_rank[pssm_correct] = 0
+                else:
+                    correct_res_rank[pssm_correct] = ranked[pssm_correct][pssm_correct]
+        else:
+            for pssm_correct in ranked: 
+                for comp_pssm in ranked[pssm_correct]:
+                    if  comp_pssm == correct_results_file[pssm_correct][0]:
+                        correct_res_rank[pssm_correct] = ranked[pssm_correct][comp_pssm]
+                    else:
+                        correct_res_rank[pssm_correct] = 0
+        
+        with open("ranked.json", "w") as ranked_file:
+            json.dump(ranked, ranked_file)
+
+        print("correct res rank")
+        print(correct_res_rank)
+
+        return ranked,correct_res_rank
+
+    def add_rank_column(self, correct_res_rank):
+        """
+        Creates a dataframe with all the correct results ranks and adds it
+        to the output best_result dataframe
+        """
+        # Turn Index to a Column
+        self.best_df = self.best_df.reset_index()
+        self.best_df = self.best_df.rename(columns={"index": "DMS"})
+        # Add the ranks column
+        rank_df = pd.DataFrame([correct_res_rank])
+        rank_df = rank_df.T
+        rank_df = rank_df.rename(columns={0: "Rank"})
+        rank_df = rank_df.reset_index()
+        rank_df = rank_df.rename(columns={"index": "DMS"})
+        print("rank df")
+        print(rank_df)
+        self.best_df = self.best_df.merge(rank_df, on="DMS")
+        # self.best_df = self.best_df.join(rank_df)
+
+        # self.best_df["Correct Result Rank"] = rank_df['Rank'].values
+        return self.best_df
+        
+    def create_top_5_file(self):
+        """
+        Creates a json file and returns a dictionary with the top 5 results for each PSSM comparison
+        """
+        # create a file with the top 5 results for each pssm
+        top_5 = {}
+        ranked = {}
+        for k, v in self.all_results.items():
+            ranked[k] = rank_dict(v)
+            res = sorted(v.items(), key=operator.itemgetter(1), reverse=True)
+            top_5[k] = res[:5]
+        with open("top_5.json", "w") as top_5_file:
+            json.dump(top_5, top_5_file)
+
+        return top_5
+    
+    def create_file(self, correct_results_file):
+        """
+        Final function to be called after each comparison.
+        Creates all the output files of the program.
+        """
+        # turn all the nan results to 0
+        for pssm in self.all_results:
+            for key, value in list(self.all_results[pssm].items()):
+                if pd.isna(value):
+                    del self.all_results[pssm][key]
+                    
+        print("self.all_results")
+        print(self.all_results)
+        
+        # create a file with the top 5 results for each pssm
+        top_5 = self.create_top_5_file()
+        # check the rank of the correct result
+        ranked,correct_res_rank = self.create_ranks(correct_results_file)
+        
         self.best_df = self.best_df.sort_values(
             by=["Comparison Results"], ascending=False
         )
+        # Add the ranks column
+        self.best_df = self.add_rank_column(correct_res_rank)
+
+        with open("all_results.json", "w") as all_results_file:
+            json.dump(self.all_results, all_results_file)
+
         # TODO: use filenames
-        self.best_df.to_csv("elm-best.csv")
+        self.best_df.to_csv("dms_vs_elm.csv")
         if hasattr(self, "all_df"):
             self.all_df.to_csv("elm-all.csv")
-        if hasattr(self, "similarity_df"):
-            print(self.similarity_df)
-            self.similarity_df.to_csv("proppd_similarity.csv")
+        # if hasattr(self, "similarity_df"):
+        #     self.similarity_df.to_csv("dms_similarity.csv")
 
     def plot_match(self):
         match_df = pd.DataFrame(self.match, columns=["Match"])
@@ -188,6 +292,13 @@ class MultiComparison:
         # print("This is the AUC ",roc_auc_score(comb_df["Match"], comb_df["Mismatch"]))
 
     def add(self, result):
+
+        # Create a dictionary that holds all the best results to be used
+        # in the ranking of the results
+        if result.base_name not in self.all_results:
+            self.all_results[result.base_name] = {}
+        self.all_results[result.base_name][result.elm] = result.comparison_results[0][1]
+        
         print("add")
         if (
             result.comparison_results[0][1]
@@ -222,8 +333,6 @@ class MultiComparison:
             self.all_df.at[result.elm, result.base_name] = result.comparison_results[0][
                 1
             ]
-
-        pearson_comp = []
 
     def add_multi_metrics_file(self, result):
         """
@@ -904,7 +1013,6 @@ class MultiComparison:
 
         plt.show()
 
-
 def plot_important_positions(single_file):
     """
     Takes a single file with multiple PSSMs and calculates for each PSSM the number
@@ -996,7 +1104,6 @@ def plot_important_positions(single_file):
         plt.show()
         return ax.figure.savefig("boxplot_logodds.png")
 
-
 def find_optimal_cutoff(target, predicted, label):
     """
     Find the optimal probability cutoff point for a classification model related to event rate
@@ -1020,3 +1127,15 @@ def find_optimal_cutoff(target, predicted, label):
     roc_t = roc.iloc[(roc.tf - 0).abs().argsort()[:1]]
 
     return list(roc_t["threshold"])
+
+def rank_dict(in_dict):
+    """
+    Order the results dictionary with descending order and create a new dictionary 
+    with all the result ranks instead of the results.
+    """
+    sorted_x = sorted(in_dict.items(), key=operator.itemgetter(1), reverse=True)
+    out_dict = {}
+    for idx, (key, _) in enumerate(sorted_x):
+        out_dict[key] = idx + 1
+
+    return out_dict
