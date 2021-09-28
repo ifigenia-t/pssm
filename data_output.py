@@ -160,11 +160,30 @@ class MultiComparison:
                     correct_res_rank[pssm_correct] = ranked[pssm_correct][pssm_correct]
         else:
             for pssm_correct in ranked: 
-                for comp_pssm in ranked[pssm_correct]:
-                    if  comp_pssm == correct_results_file[pssm_correct][0]:
-                        correct_res_rank[pssm_correct] = ranked[pssm_correct][comp_pssm]
+                print(pssm_correct)
+                if pssm_correct not in self.correct_results:
+                    correct_result = 0
+                else:
+                    best_rank = {}
+                    for result in self.correct_results[pssm_correct]:
+                        if result in ranked[pssm_correct]:
+                            best_rank[result] = ranked[pssm_correct][result]
+                    best_rank_sorted = sorted(best_rank.items(), key=operator.itemgetter(1))
+                    print(best_rank_sorted)
+                    if len(best_rank_sorted) == 0:
+                        correct_result = 0
                     else:
-                        correct_res_rank[pssm_correct] = 0
+                        correct_result = best_rank_sorted[0][1]
+
+                correct_res_rank[pssm_correct] = correct_result
+                    
+
+                    # for comp_pssm in ranked[pssm_correct]:
+                        
+                    #     if  comp_pssm == correct_results_file[pssm_correct][0]:
+                    #         correct_res_rank[pssm_correct] = ranked[pssm_correct][comp_pssm]
+                    #     else:
+                    #         correct_res_rank[pssm_correct] = 0
         
         with open("ranked.json", "w") as ranked_file:
             json.dump(ranked, ranked_file)
@@ -224,8 +243,14 @@ class MultiComparison:
                     del self.all_results[pssm][key]
                     
         print("self.all_results")
-        print(self.all_results)
-        
+        print(self.all_results) 
+
+        print("self.match")
+        print(self.match)
+
+        print("self.correct_rank")
+        print(self.correct_rank)
+
         # create a file with the top 5 results for each pssm
         top_5 = self.create_top_5_file()
         # check the rank of the correct result
@@ -319,11 +344,14 @@ class MultiComparison:
             ]
 
         if hasattr(self, "correct_results"):
+            self.correct_rank = {}
             print("comparing")
             if result.elm in self.correct_results[result.base_name]:
                 print(result.base_name, result.elm, "match")
                 self.match.append(result.comparison_results[0][1])
                 print("match", result.comparison_results[1])
+                self.correct_rank[result.base_name] = {}
+                self.correct_rank[result.base_name][result.elm] = result.comparison_results[0][1]
             else:
                 self.mismatch.append(result.comparison_results[0][1])
                 print(result.base_name, result.elm, "miss")
